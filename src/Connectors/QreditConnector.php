@@ -8,8 +8,8 @@ use Saloon\Http\Connector;
 use Saloon\Traits\Plugins\HasTimeout;
 use Saloon\Traits\Plugins\AcceptsJson;
 use Saloon\Contracts\Authenticator;
-use Saloon\Http\Auth\TokenAuthenticator;
 use Saloon\Http\Response;
+use Saloon\Http\PendingRequest;
 use Saloon\Exceptions\Request\FatalRequestException;
 use Saloon\Exceptions\Request\RequestException;
 use Qredit\LaravelQredit\Exceptions\QreditApiException;
@@ -75,6 +75,11 @@ class QreditConnector extends Connector
             'X-API-Key' => $this->apiKey,
         ];
 
+        // Add authentication token as X-Auth-Token header if available
+        if ($this->authToken) {
+            $headers['X-Auth-Token'] = $this->authToken;
+        }
+
         // Add language header if configured
         if ($language = config('qredit.language')) {
             $headers['Accept-Language'] = $language;
@@ -85,13 +90,11 @@ class QreditConnector extends Connector
 
     /**
      * Default authentication for requests.
+     * We don't use Saloon's built-in auth since Qredit uses X-Auth-Token header
      */
     protected function defaultAuth(): ?Authenticator
     {
-        if ($this->authToken) {
-            return new TokenAuthenticator($this->authToken, 'Bearer');
-        }
-
+        // We handle auth token in defaultHeaders() as X-Auth-Token
         return null;
     }
 
@@ -149,33 +152,27 @@ class QreditConnector extends Connector
     }
 
     /**
-     * Boot the connector.
+     * Boot the connector (Saloon v3 compatibility).
      */
-    public function boot(\Saloon\Http\PendingRequest $pendingRequest): void
+    public function boot(PendingRequest $pendingRequest): void
     {
-        // Add request ID for tracking
-        $pendingRequest->headers()->add('X-Request-ID', $this->generateRequestId());
+        // Add debugging if enabled
+        if (config('qredit.debug', false)) {
+            $pendingRequest->middleware()->onRequest(function (PendingRequest $request) {
+                \Illuminate\Support\Facades\Log::debug('Qredit API Request', [
+                    'method' => $request->getMethod(),
+                    'url' => $request->getUrl(),
+                    'headers' => $request->headers()->all(),
+                    'body' => $request->body()?->all(),
+                ]);
+            });
 
-        // Log requests if debug mode is enabled
-        if (config('qredit.debug', true)) {
             $pendingRequest->middleware()->onResponse(function (Response $response) {
-                logger()->debug('Qredit API Response', [
+                \Illuminate\Support\Facades\Log::debug('Qredit API Response', [
                     'status' => $response->status(),
                     'body' => $response->json(),
                 ]);
             });
         }
-    }
-
-    /**
-     * Generate a unique request ID.
-     */
-    protected function generateRequestId(): string
-    {
-        return sprintf(
-            '%s-%s',
-            config('app.name', 'laravel'),
-            uniqid('', true)
-        );
     }
 }

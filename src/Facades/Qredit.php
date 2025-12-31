@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static bool deletePayment(string $paymentRequestId)
  * @method static array listPayments(array $query = [])
  * @method static array createOrder(array $data)
+ * @method static array registerOrder(array $data)
  * @method static array getOrder(string $orderId)
  * @method static array updateOrder(string $orderId, array $data)
  * @method static array cancelOrder(string $orderId, ?string $reason = null)

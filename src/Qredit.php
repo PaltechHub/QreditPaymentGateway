@@ -216,6 +216,14 @@ class Qredit
     }
 
     /**
+     * Register a new order (alias for createOrder for clarity).
+     */
+    public function registerOrder(array $data): array
+    {
+        return $this->createOrder($data);
+    }
+
+    /**
      * Get an order by ID.
      */
     public function getOrder(string $orderId): array

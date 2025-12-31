@@ -197,4 +197,48 @@ return [
         'channel' => env('QREDIT_LOG_CHANNEL', 'stack'),
         'level' => env('QREDIT_LOG_LEVEL', 'debug'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Payment Channels Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configure which payment channels are enabled for your integration.
+    | Available channels: qr, card, wallet
+    |
+    */
+    'payment_channels' => [
+        'qr' => env('QREDIT_PAYMENT_CHANNEL_QR', true),
+        'card' => env('QREDIT_PAYMENT_CHANNEL_CARD', false),
+        'wallet' => env('QREDIT_PAYMENT_CHANNEL_WALLET', false),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Shipping Provider Codes
+    |--------------------------------------------------------------------------
+    |
+    | Map your shipping provider names to Qredit shipping codes.
+    |
+    */
+    'shipping_providers' => [
+        'standard' => 'standard',
+        'express' => 'express',
+        'optimus' => 'optimus',
+        'aramex' => 'aramex',
+        'dhl' => 'dhl',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Order Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configure order-related settings.
+    |
+    */
+    'order' => [
+        'lock_when_paid' => env('QREDIT_LOCK_ORDER_WHEN_PAID', false),
+        'payment_expiration_minutes' => env('QREDIT_PAYMENT_EXPIRATION_MINUTES', 1440), // 24 hours
+    ],
 ];
