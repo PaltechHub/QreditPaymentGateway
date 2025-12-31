@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace Qredit\LaravelQredit\Requests\PaymentRequests;
 
 use Saloon\Enums\Method;
-use Saloon\Http\Request;
+use Qredit\LaravelQredit\Requests\BaseQreditRequest;
 use Saloon\Contracts\Body\HasBody;
 use Saloon\Traits\Body\HasJsonBody;
+use Qredit\LaravelQredit\Traits\HasMessageId;
 
-class CreatePaymentRequest extends Request implements HasBody
+class CreatePaymentRequest extends BaseQreditRequest implements HasBody
 {
     use HasJsonBody;
+    use HasMessageId;
 
     /**
      * The HTTP method of the request.
@@ -29,6 +31,7 @@ class CreatePaymentRequest extends Request implements HasBody
     public function __construct(array $data)
     {
         $this->data = $data;
+        $this->messageIdType = 'payment.create';
     }
 
     /**
@@ -53,24 +56,15 @@ class CreatePaymentRequest extends Request implements HasBody
     }
 
     /**
-     * Default headers for the request.
+     * Get context for message ID generation.
      */
-    protected function defaultHeaders(): array
+    protected function getMessageIdContext(): array
     {
-        return [
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json',
-            'Client-Type' => 'MP',
-            'Client-Version' => '1.0.0',
-            'Accept-Language' => config('qredit.language', 'EN'),
-        ];
-    }
+        // Include client reference if available for better tracking
+        if (isset($this->data['clientReference'])) {
+            return ['ref' => $this->data['clientReference']];
+        }
 
-    /**
-     * Generate a unique message ID for the request.
-     */
-    protected function generateMessageId(): string
-    {
-        return uniqid('pr_', true) . '_' . time();
+        return [];
     }
 }

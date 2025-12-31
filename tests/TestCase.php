@@ -20,6 +20,15 @@ abstract class TestCase extends Orchestra
     }
 
     /**
+     * Clean up the testing environment before the next test.
+     */
+    protected function tearDown(): void
+    {
+        \Mockery::close();
+        parent::tearDown();
+    }
+
+    /**
      * Get package providers.
      */
     protected function getPackageProviders($app): array
@@ -120,5 +129,16 @@ abstract class TestCase extends Orchestra
     protected function generateWebhookSignature(array $payload, string $secret): string
     {
         return hash_hmac('sha512', json_encode($payload), $secret);
+    }
+
+    /**
+     * Get a test connector instance.
+     */
+    protected function getTestConnector(): \Qredit\LaravelQredit\Connectors\QreditConnector
+    {
+        return new \Qredit\LaravelQredit\Connectors\QreditConnector(
+            apiKey: 'test-api-key',
+            sandbox: true
+        );
     }
 }

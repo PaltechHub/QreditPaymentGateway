@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Qredit\LaravelQredit\Requests\Orders;
+namespace Qredit\LaravelQredit\Requests\PaymentRequests;
 
 use Saloon\Enums\Method;
 use Qredit\LaravelQredit\Requests\BaseQreditRequest;
@@ -10,7 +10,7 @@ use Saloon\Contracts\Body\HasBody;
 use Saloon\Traits\Body\HasJsonBody;
 use Qredit\LaravelQredit\Traits\HasMessageId;
 
-class UpdateOrderRequest extends BaseQreditRequest implements HasBody
+class CancelPaymentRequest extends BaseQreditRequest implements HasBody
 {
     use HasJsonBody;
     use HasMessageId;
@@ -18,27 +18,27 @@ class UpdateOrderRequest extends BaseQreditRequest implements HasBody
     /**
      * The HTTP method of the request.
      */
-    protected Method $method = Method::PUT;
+    protected Method $method = Method::DELETE;
 
     /**
 
     /**
-     * The order ID.
+     * The payment request ID.
      */
-    protected string $orderId;
+    protected string $paymentRequestId;
 
     /**
-     * The update data.
+     * Optional cancellation reason.
      */
-    protected array $data;
+    protected ?string $reason;
 
     /**
-     * Create a new update order request.
+     * Create a new cancel payment request.
      */
-    public function __construct(string $orderId, array $data)
+    public function __construct(string $paymentRequestId, ?string $reason = null)
     {
-        $this->orderId = $orderId;
-        $this->data = $data;
+        $this->paymentRequestId = $paymentRequestId;
+        $this->reason = $reason;
     }
 
     /**
@@ -46,7 +46,7 @@ class UpdateOrderRequest extends BaseQreditRequest implements HasBody
      */
     public function resolveEndpoint(): string
     {
-        return '/orders/' . $this->orderId;
+        return '/paymentRequests/' . $this->paymentRequestId;
     }
 
     /**
@@ -54,12 +54,16 @@ class UpdateOrderRequest extends BaseQreditRequest implements HasBody
      */
     protected function defaultBody(): array
     {
-        $defaultData = [
+        $body = [
             'msgId' => $this->generateMessageId(),
             'transactionDate' => date('d/m/Y'),
         ];
 
-        return array_merge($defaultData, $this->data);
+        if ($this->reason !== null) {
+            $body['reason'] = $this->reason;
+        }
+
+        return $body;
     }
 
 }

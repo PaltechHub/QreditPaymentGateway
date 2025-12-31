@@ -183,7 +183,6 @@ Contributors will be recognized in:
 
 If you'd like to financially support the project, consider:
 - Sponsoring via GitHub Sponsors
-- One-time donations via PayPal
 - Corporate sponsorship
 
 Thank you for contributing! 🎉

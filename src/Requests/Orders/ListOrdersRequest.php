@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Qredit\LaravelQredit\Requests\Orders;
 
 use Saloon\Enums\Method;
-use Saloon\Http\Request;
+use Qredit\LaravelQredit\Requests\BaseQreditRequest;
 
-class ListOrdersRequest extends Request
+class ListOrdersRequest extends BaseQreditRequest
 {
     /**
      * The HTTP method of the request.
@@ -17,14 +17,14 @@ class ListOrdersRequest extends Request
     /**
      * Query parameters.
      */
-    protected array $query;
+    protected array $queryParams;
 
     /**
      * Create a new list orders request.
      */
     public function __construct(array $query = [])
     {
-        $this->query = $query;
+        $this->queryParams = $query;
     }
 
     /**
@@ -40,6 +40,6 @@ class ListOrdersRequest extends Request
      */
     protected function defaultQuery(): array
     {
-        return $this->query;
+        return $this->queryParams;
     }
 }

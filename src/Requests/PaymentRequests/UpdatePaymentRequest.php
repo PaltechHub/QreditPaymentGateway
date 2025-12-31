@@ -5,18 +5,22 @@ declare(strict_types=1);
 namespace Qredit\LaravelQredit\Requests\PaymentRequests;
 
 use Saloon\Enums\Method;
-use Saloon\Http\Request;
+use Qredit\LaravelQredit\Requests\BaseQreditRequest;
 use Saloon\Contracts\Body\HasBody;
 use Saloon\Traits\Body\HasJsonBody;
+use Qredit\LaravelQredit\Traits\HasMessageId;
 
-class UpdatePaymentRequest extends Request implements HasBody
+class UpdatePaymentRequest extends BaseQreditRequest implements HasBody
 {
     use HasJsonBody;
+    use HasMessageId;
 
     /**
      * The HTTP method of the request.
      */
     protected Method $method = Method::PUT;
+
+    /**
 
     /**
      * The payment request ID.
@@ -42,7 +46,7 @@ class UpdatePaymentRequest extends Request implements HasBody
      */
     public function resolveEndpoint(): string
     {
-        return '/payment-requests/' . $this->paymentRequestId;
+        return '/paymentRequests/' . $this->paymentRequestId;
     }
 
     /**
@@ -50,6 +54,10 @@ class UpdatePaymentRequest extends Request implements HasBody
      */
     protected function defaultBody(): array
     {
-        return $this->data;
+        return array_merge([
+            'msgId' => $this->generateMessageId(),
+            'transactionDate' => date('d/m/Y'),
+        ], $this->data);
     }
+
 }

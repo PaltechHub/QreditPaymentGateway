@@ -5,14 +5,19 @@ declare(strict_types=1);
 namespace Qredit\LaravelQredit\Requests\PaymentRequests;
 
 use Saloon\Enums\Method;
-use Saloon\Http\Request;
+use Qredit\LaravelQredit\Requests\BaseQreditRequest;
+use Qredit\LaravelQredit\Traits\HasMessageId;
 
-class GetPaymentRequest extends Request
+class GetPaymentRequest extends BaseQreditRequest
 {
+    use HasMessageId;
+
     /**
      * The HTTP method of the request.
      */
     protected Method $method = Method::GET;
+
+    /**
 
     /**
      * The payment request ID.
@@ -32,6 +37,17 @@ class GetPaymentRequest extends Request
      */
     public function resolveEndpoint(): string
     {
-        return '/payment-requests/' . $this->paymentRequestId;
+        return '/paymentRequests/' . $this->paymentRequestId;
     }
+
+    /**
+     * Default query parameters for the request.
+     */
+    protected function defaultQuery(): array
+    {
+        return [
+            'msgId' => $this->generateMessageId(),
+        ];
+    }
+
 }

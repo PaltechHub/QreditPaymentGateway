@@ -5,18 +5,22 @@ declare(strict_types=1);
 namespace Qredit\LaravelQredit\Requests\Orders;
 
 use Saloon\Enums\Method;
-use Saloon\Http\Request;
+use Qredit\LaravelQredit\Requests\BaseQreditRequest;
 use Saloon\Contracts\Body\HasBody;
 use Saloon\Traits\Body\HasJsonBody;
+use Qredit\LaravelQredit\Traits\HasMessageId;
 
-class CancelOrderRequest extends Request implements HasBody
+class CancelOrderRequest extends BaseQreditRequest implements HasBody
 {
     use HasJsonBody;
+    use HasMessageId;
 
     /**
      * The HTTP method of the request.
      */
-    protected Method $method = Method::POST;
+    protected Method $method = Method::DELETE;
+
+    /**
 
     /**
      * The order ID.
@@ -42,7 +46,7 @@ class CancelOrderRequest extends Request implements HasBody
      */
     public function resolveEndpoint(): string
     {
-        return '/orders/' . $this->orderId . '/cancel';
+        return '/orders/' . $this->orderId;
     }
 
     /**
@@ -50,7 +54,10 @@ class CancelOrderRequest extends Request implements HasBody
      */
     protected function defaultBody(): array
     {
-        $body = [];
+        $body = [
+            'msgId' => $this->generateMessageId(),
+            'transactionDate' => date('d/m/Y'),
+        ];
 
         if ($this->reason !== null) {
             $body['reason'] = $this->reason;
@@ -58,4 +65,5 @@ class CancelOrderRequest extends Request implements HasBody
 
         return $body;
     }
+
 }

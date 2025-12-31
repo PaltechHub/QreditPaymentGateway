@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace Qredit\LaravelQredit\Requests\Auth;
 
 use Saloon\Enums\Method;
-use Saloon\Http\Request;
+use Qredit\LaravelQredit\Requests\BaseQreditRequest;
 use Saloon\Contracts\Body\HasBody;
 use Saloon\Traits\Body\HasJsonBody;
+use Qredit\LaravelQredit\Traits\HasMessageId;
 
-class GetTokenRequest extends Request implements HasBody
+class GetTokenRequest extends BaseQreditRequest implements HasBody
 {
     use HasJsonBody;
+    use HasMessageId;
 
     /**
      * The HTTP method of the request.
@@ -29,6 +31,7 @@ class GetTokenRequest extends Request implements HasBody
     public function __construct(string $apiKey)
     {
         $this->apiKey = $apiKey;
+        $this->messageIdType = 'auth.token';
     }
 
     /**
@@ -50,22 +53,4 @@ class GetTokenRequest extends Request implements HasBody
         ];
     }
 
-    /**
-     * Generate a unique message ID for the request.
-     */
-    protected function generateMessageId(): string
-    {
-        return uniqid('msg_', true) . '_' . time();
-    }
-
-    /**
-     * Default headers for the request.
-     */
-    protected function defaultHeaders(): array
-    {
-        return [
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json',
-        ];
-    }
 }

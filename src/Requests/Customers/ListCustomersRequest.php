@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Qredit\LaravelQredit\Requests\PaymentRequests;
+namespace Qredit\LaravelQredit\Requests\Customers;
 
 use Saloon\Enums\Method;
 use Qredit\LaravelQredit\Requests\BaseQreditRequest;
 use Qredit\LaravelQredit\Traits\HasMessageId;
 
-class ListPaymentRequestsRequest extends BaseQreditRequest
+class ListCustomersRequest extends BaseQreditRequest
 {
     use HasMessageId;
 
@@ -23,12 +23,12 @@ class ListPaymentRequestsRequest extends BaseQreditRequest
     protected array $queryParams;
 
     /**
-     * Create a new list payment requests request.
+     * Create a new list customers request.
      */
     public function __construct(array $query = [])
     {
         $this->queryParams = $query;
-        $this->messageIdType = 'payment.list';
+        $this->messageIdType = 'customer.list';
     }
 
     /**
@@ -36,7 +36,7 @@ class ListPaymentRequestsRequest extends BaseQreditRequest
      */
     public function resolveEndpoint(): string
     {
-        return '/paymentRequests';
+        return '/customers';
     }
 
     /**
@@ -52,19 +52,10 @@ class ListPaymentRequestsRequest extends BaseQreditRequest
 
         // Add optional filters
         $optionalFields = [
-            'reference',
-            'orderReference',
-            'clientReference',
-            'subCorporateId',
-            'dateFrom',
-            'dateTo',
-            'currencyCode',
-            'cityCode',
-            'areaCode',
-            'customerName',
-            'customerPhone',
-            'customerEmail',
-            'status',
+            'name',
+            'phone',
+            'email',
+            'idNumber',
             'sSearch',
             'orderColumnName',
             'orderDirection',
@@ -78,5 +69,4 @@ class ListPaymentRequestsRequest extends BaseQreditRequest
 
         return $defaults;
     }
-
 }

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Qredit\LaravelQredit\Requests\PaymentRequests;
+namespace Qredit\LaravelQredit\Requests\Transactions;
 
 use Saloon\Enums\Method;
 use Qredit\LaravelQredit\Requests\BaseQreditRequest;
 use Qredit\LaravelQredit\Traits\HasMessageId;
 
-class ListPaymentRequestsRequest extends BaseQreditRequest
+class ListTransactionsRequest extends BaseQreditRequest
 {
     use HasMessageId;
 
@@ -23,12 +23,12 @@ class ListPaymentRequestsRequest extends BaseQreditRequest
     protected array $queryParams;
 
     /**
-     * Create a new list payment requests request.
+     * Create a new list transactions request.
      */
     public function __construct(array $query = [])
     {
         $this->queryParams = $query;
-        $this->messageIdType = 'payment.list';
+        $this->messageIdType = 'transaction.list';
     }
 
     /**
@@ -36,7 +36,7 @@ class ListPaymentRequestsRequest extends BaseQreditRequest
      */
     public function resolveEndpoint(): string
     {
-        return '/paymentRequests';
+        return '/payments';
     }
 
     /**
@@ -53,18 +53,19 @@ class ListPaymentRequestsRequest extends BaseQreditRequest
         // Add optional filters
         $optionalFields = [
             'reference',
-            'orderReference',
             'clientReference',
+            'providerReference',
+            'paymentRequestReference',
+            'orderReference',
+            'corporateId',
             'subCorporateId',
+            'subCorporateAccountId',
             'dateFrom',
             'dateTo',
             'currencyCode',
-            'cityCode',
-            'areaCode',
-            'customerName',
-            'customerPhone',
-            'customerEmail',
-            'status',
+            'operation',
+            'onlyBalanceTransactions',
+            'transactionStatus',
             'sSearch',
             'orderColumnName',
             'orderDirection',
@@ -78,5 +79,4 @@ class ListPaymentRequestsRequest extends BaseQreditRequest
 
         return $defaults;
     }
-
 }

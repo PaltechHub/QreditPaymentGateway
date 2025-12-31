@@ -5,14 +5,19 @@ declare(strict_types=1);
 namespace Qredit\LaravelQredit\Requests\Orders;
 
 use Saloon\Enums\Method;
-use Saloon\Http\Request;
+use Qredit\LaravelQredit\Requests\BaseQreditRequest;
+use Qredit\LaravelQredit\Traits\HasMessageId;
 
-class GetOrderRequest extends Request
+class GetOrderRequest extends BaseQreditRequest
 {
+    use HasMessageId;
+
     /**
      * The HTTP method of the request.
      */
     protected Method $method = Method::GET;
+
+    /**
 
     /**
      * The order ID.
@@ -33,5 +38,15 @@ class GetOrderRequest extends Request
     public function resolveEndpoint(): string
     {
         return '/orders/' . $this->orderId;
+    }
+
+    /**
+     * Default query parameters for the request.
+     */
+    protected function defaultQuery(): array
+    {
+        return [
+            'msgId' => $this->generateMessageId(),
+        ];
     }
 }

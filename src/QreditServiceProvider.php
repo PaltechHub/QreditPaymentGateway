@@ -32,7 +32,7 @@ class QreditServiceProvider extends ServiceProvider
         $this->app->singleton(Qredit::class, function ($app) {
             return new Qredit(
                 config('qredit.api_key'),
-                config('qredit.sandbox', false)
+                config('qredit.sandbox', true)
             );
         });
 
@@ -73,7 +73,7 @@ class QreditServiceProvider extends ServiceProvider
      */
     protected function registerRoutes(): void
     {
-        if (config('qredit.webhook.enabled', true)) {
+        if (config('qredit.webhook.enabled', false)) {
             Route::group($this->webhookRouteConfiguration(), function () {
                 Route::post(
                     config('qredit.webhook.path', '/qredit/webhook'),
@@ -90,7 +90,7 @@ class QreditServiceProvider extends ServiceProvider
     {
         return [
             'prefix' => config('qredit.webhook.prefix', ''),
-            'middleware' => config('qredit.webhook.middleware', ['api']),
+            'middleware' => config('qredit.webhook.middleware', []),
         ];
     }
 
@@ -102,7 +102,6 @@ class QreditServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 Commands\QreditTestCommand::class,
-                Commands\QreditWebhookCommand::class,
             ]);
         }
     }

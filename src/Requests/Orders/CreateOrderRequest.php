@@ -5,18 +5,22 @@ declare(strict_types=1);
 namespace Qredit\LaravelQredit\Requests\Orders;
 
 use Saloon\Enums\Method;
-use Saloon\Http\Request;
+use Qredit\LaravelQredit\Requests\BaseQreditRequest;
 use Saloon\Contracts\Body\HasBody;
 use Saloon\Traits\Body\HasJsonBody;
+use Qredit\LaravelQredit\Traits\HasMessageId;
 
-class CreateOrderRequest extends Request implements HasBody
+class CreateOrderRequest extends BaseQreditRequest implements HasBody
 {
     use HasJsonBody;
+    use HasMessageId;
 
     /**
      * The HTTP method of the request.
      */
     protected Method $method = Method::POST;
+
+    /**
 
     /**
      * The order data.
@@ -44,6 +48,24 @@ class CreateOrderRequest extends Request implements HasBody
      */
     protected function defaultBody(): array
     {
-        return $this->data;
+        $defaultData = [
+            'msgId' => $this->generateMessageId(),
+            'transactionDate' => date('d/m/Y'),
+        ];
+
+        return array_merge($defaultData, $this->data);
+    }
+
+    /**
+     * Get context for message ID generation.
+     */
+    protected function getMessageIdContext(): array
+    {
+        // Include order reference if available for better tracking
+        if (isset($this->data['orderReference'])) {
+            return ['ref' => $this->data['orderReference']];
+        }
+
+        return [];
     }
 }

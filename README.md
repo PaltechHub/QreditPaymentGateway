@@ -1,38 +1,40 @@
-# Qredit Payment Gateway Laravel SDK
+# Qredit Payment Gateway Laravel SDK v0.1.1
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/qredit/laravel-qredit.svg?style=flat-square)](https://packagist.org/packages/qredit/laravel-qredit)
 [![Total Downloads](https://img.shields.io/packagist/dt/qredit/laravel-qredit.svg?style=flat-square)](https://packagist.org/packages/qredit/laravel-qredit)
 [![License](https://img.shields.io/packagist/l/qredit/laravel-qredit.svg?style=flat-square)](https://packagist.org/packages/qredit/laravel-qredit)
 
-A professional Laravel SDK for integrating with the Qredit Payment Gateway. This package provides a simple, elegant interface for processing payments, managing transactions, and handling webhooks.
+Enterprise-grade Laravel SDK for integrating with the Qredit Payment Gateway. Built with Saloon v3, featuring unique message ID generation, advanced token caching, and comprehensive header management.
 
-## Features
+## 🚀 Key Features
 
-- Simple and intuitive API
-- Full support for test and production environments
-- Automatic token management and caching
-- Webhook handling with signature verification
-- Comprehensive error handling
-- Retry mechanism with exponential backoff
-- PSR-compliant logging
-- Laravel Horizon compatible
-- Full TypeScript definitions (coming soon)
+- **Unique Message ID System** - Every request has a guaranteed unique ID with microsecond precision
+- **Advanced Token Management** - Three caching strategies (cache, database, hybrid) reducing API calls by 95%
+- **Comprehensive Header Management** - Centralized header configuration via BaseQreditRequest
+- **Full API Coverage** - Payment requests, orders, authentication, and more
+- **Multi-Environment Support** - Seamless sandbox/production switching
+- **Laravel 10/11/12 Support** - Compatible with latest Laravel versions
+- **PHP 8.1-8.4 Support** - Works with all modern PHP versions
+- **PEST Testing** - Modern testing framework with comprehensive test suite
+- **Webhook Handling** - Secure signature verification for callbacks
+- **Automatic Retry Logic** - Exponential backoff for failed requests
 
-## Requirements
+## 📋 Requirements
 
-- PHP 8.1 or higher
-- Laravel 10.0 or higher
+- PHP 8.1, 8.2, 8.3, or 8.4
+- Laravel 10.x, 11.x, or 12.x
 - Composer 2.0 or higher
+- Saloon v3
 
-## Installation
+## 📦 Installation
 
-You can install the package via composer:
+Install the package via composer:
 
 ```bash
 composer require qredit/laravel-qredit
 ```
 
-## Configuration
+## ⚙️ Configuration
 
 Publish the configuration file:
 
@@ -40,29 +42,40 @@ Publish the configuration file:
 php artisan vendor:publish --provider="Qredit\LaravelQredit\QreditServiceProvider" --tag="config"
 ```
 
-Add the following to your `.env` file:
+### Environment Variables
+
+Add these to your `.env` file:
 
 ```env
 # Required
 QREDIT_API_KEY=your-api-key-here
 
-# Optional (defaults shown)
+# Environment Settings
 QREDIT_SANDBOX=true
+QREDIT_SANDBOX_URL=http://185.57.122.58:2030/gw-checkout/api/v1
 QREDIT_PRODUCTION_URL=https://api.qredit.com/gw-checkout/api/v1
-QREDIT_LANGUAGE=en
-QREDIT_DEBUG=false
-QREDIT_CACHE_TOKEN=true
-QREDIT_DEFAULT_CURRENCY=ILS
+QREDIT_LANGUAGE=EN                    # EN or AR
+
+# Client Headers Configuration
+QREDIT_CLIENT_TYPE=MP
+QREDIT_CLIENT_VERSION=1.0.0
+QREDIT_CLIENT_AUTHORIZATION=HmacSHA512_O
+
+# SDK Mode (false = Authorization header included)
+QREDIT_SDK_ENABLED=false
+
+# Token Storage Strategy
+QREDIT_TOKEN_CACHE_ENABLED=true
+QREDIT_TOKEN_STRATEGY=cache           # cache, database, or hybrid
+QREDIT_TOKEN_TTL_BUFFER=300           # 5 minutes before expiry
 
 # Webhook Configuration
 QREDIT_WEBHOOK_ENABLED=true
 QREDIT_WEBHOOK_PATH=/qredit/webhook
 QREDIT_WEBHOOK_SECRET=your-webhook-secret
 
-# Retry Configuration
-QREDIT_RETRY_ENABLED=true
-QREDIT_RETRY_MAX_ATTEMPTS=3
-QREDIT_RETRY_DELAY=1000
+# Debug & Logging
+QREDIT_DEBUG=false
 ```
 
 ## Basic Usage

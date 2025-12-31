@@ -11,13 +11,15 @@ use Qredit\LaravelQredit\Requests\Auth\GetTokenRequest;
 use Qredit\LaravelQredit\Requests\PaymentRequests\CreatePaymentRequest;
 use Qredit\LaravelQredit\Requests\PaymentRequests\GetPaymentRequest;
 use Qredit\LaravelQredit\Requests\PaymentRequests\UpdatePaymentRequest;
-use Qredit\LaravelQredit\Requests\PaymentRequests\DeletePaymentRequest;
+use Qredit\LaravelQredit\Requests\PaymentRequests\CancelPaymentRequest;
 use Qredit\LaravelQredit\Requests\PaymentRequests\ListPaymentRequestsRequest;
 use Qredit\LaravelQredit\Requests\Orders\CreateOrderRequest;
 use Qredit\LaravelQredit\Requests\Orders\GetOrderRequest;
 use Qredit\LaravelQredit\Requests\Orders\UpdateOrderRequest;
 use Qredit\LaravelQredit\Requests\Orders\CancelOrderRequest;
 use Qredit\LaravelQredit\Requests\Orders\ListOrdersRequest;
+use Qredit\LaravelQredit\Requests\Customers\ListCustomersRequest;
+use Qredit\LaravelQredit\Requests\Transactions\ListTransactionsRequest;
 use Qredit\LaravelQredit\Exceptions\QreditAuthenticationException;
 use Qredit\LaravelQredit\Exceptions\QreditException;
 
@@ -36,7 +38,7 @@ class Qredit
     /**
      * Create a new Qredit instance.
      */
-    public function __construct(?string $apiKey = null, ?bool $sandbox = null)
+    public function __construct(?string $apiKey = null, ?bool $sandbox = null, bool $skipAuth = false)
     {
         $apiKey = $apiKey ?? config('qredit.api_key');
         $sandbox = $sandbox ?? config('qredit.sandbox', false);
@@ -47,8 +49,10 @@ class Qredit
 
         $this->connector = new QreditConnector($apiKey, $sandbox);
 
-        // Attempt to authenticate and set token
-        $this->authenticate();
+        // Attempt to authenticate and set token (skip in test environment if requested)
+        if (!$skipAuth) {
+            $this->authenticate();
+        }
     }
 
     /**
@@ -132,6 +136,16 @@ class Qredit
     }
 
     /**
+     * Ensure the client is authenticated.
+     */
+    protected function ensureAuthenticated(): void
+    {
+        if (!$this->connector->getAuthToken()) {
+            $this->authenticate();
+        }
+    }
+
+    /**
      * Send a request with automatic token refresh on 401 errors.
      */
     protected function sendWithRetry($request): Response
@@ -179,7 +193,7 @@ class Qredit
      */
     public function deletePayment(string $paymentRequestId): bool
     {
-        $response = $this->sendWithRetry(new DeletePaymentRequest($paymentRequestId));
+        $response = $this->sendWithRetry(new CancelPaymentRequest($paymentRequestId));
         return $response->successful();
     }
 
@@ -234,6 +248,28 @@ class Qredit
     public function listOrders(array $query = []): array
     {
         $response = $this->sendWithRetry(new ListOrdersRequest($query));
+        return $response->json();
+    }
+
+    /**
+     * List customers.
+     */
+    public function listCustomers(array $filters = []): array
+    {
+        $this->ensureAuthenticated();
+
+        $response = $this->sendWithRetry(new ListCustomersRequest($filters));
+        return $response->json();
+    }
+
+    /**
+     * List transactions (payments).
+     */
+    public function listTransactions(array $filters = []): array
+    {
+        $this->ensureAuthenticated();
+
+        $response = $this->sendWithRetry(new ListTransactionsRequest($filters));
         return $response->json();
     }
 

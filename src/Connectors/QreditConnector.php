@@ -59,10 +59,8 @@ class QreditConnector extends Connector
      */
     public function resolveBaseUrl(): string
     {
-        // Using the test environment URL provided
-        // In production, this would be replaced with the actual production URL
         return $this->sandbox
-            ? 'http://185.57.122.58:2030/gw-checkout/api/v1'
+            ? config('qredit.sandbox_url', 'http://185.57.122.58:2030/gw-checkout/api/v1')
             : config('qredit.production_url', 'https://api.qredit.com/gw-checkout/api/v1');
     }
 
@@ -153,22 +151,20 @@ class QreditConnector extends Connector
     /**
      * Boot the connector.
      */
-    public function boot(): void
+    public function boot(\Saloon\Http\PendingRequest $pendingRequest): void
     {
-        $this->middleware()->onRequest(function ($pendingRequest) {
-            // Add request ID for tracking
-            $pendingRequest->headers()->add('X-Request-ID', $this->generateRequestId());
-        });
+        // Add request ID for tracking
+        $pendingRequest->headers()->add('X-Request-ID', $this->generateRequestId());
 
-        $this->middleware()->onResponse(function (Response $response) {
-            // Log successful responses if debug mode is enabled
-            if (config('qredit.debug', false)) {
+        // Log requests if debug mode is enabled
+        if (config('qredit.debug', true)) {
+            $pendingRequest->middleware()->onResponse(function (Response $response) {
                 logger()->debug('Qredit API Response', [
                     'status' => $response->status(),
                     'body' => $response->json(),
                 ]);
-            }
-        });
+            });
+        }
     }
 
     /**

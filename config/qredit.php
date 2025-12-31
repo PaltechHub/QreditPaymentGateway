@@ -25,6 +25,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Sandbox URL
+    |--------------------------------------------------------------------------
+    |
+    | The sandbox/testing API URL for Qredit. This will be used when sandbox
+    | mode is enabled.
+    |
+    */
+    'sandbox_url' => env('QREDIT_SANDBOX_URL', 'http://185.57.122.58:2030/gw-checkout/api/v1'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Production URL
     |--------------------------------------------------------------------------
     |
@@ -39,10 +50,35 @@ return [
     | Language
     |--------------------------------------------------------------------------
     |
-    | The default language for API responses. Supported: 'en', 'ar'
+    | The default language for API responses. Supported: 'EN', 'AR'
     |
     */
-    'language' => env('QREDIT_LANGUAGE', 'ar'),
+    'language' => env('QREDIT_LANGUAGE', 'EN'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Client Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for client identification in API requests.
+    | These headers are included in every API request.
+    |
+    */
+    'client' => [
+        'type' => env('QREDIT_CLIENT_TYPE', 'MP'),
+        'version' => env('QREDIT_CLIENT_VERSION', '1.0.0'),
+        'authorization' => env('QREDIT_CLIENT_AUTHORIZATION', 'HmacSHA512_O'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | SDK Mode Configuration
+    |--------------------------------------------------------------------------
+    |
+    | When sdk_enabled is false, adds Authorization header to all requests
+    |
+    */
+    'sdk_enabled' => env('QREDIT_SDK_ENABLED', true),
 
     /*
     |--------------------------------------------------------------------------
@@ -57,13 +93,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Token Caching
+    | Token Management
     |--------------------------------------------------------------------------
     |
-    | Whether to cache authentication tokens to reduce API calls. The tokens
-    | will be cached for their validity period minus 60 seconds.
+    | Configure how authentication tokens are stored and managed.
+    | Strategy options:
+    | - 'cache': Use Laravel's cache (Redis/Memcached) - Best for single server
+    | - 'database': Store in database - Best for multi-server setups
+    | - 'hybrid': Cache with database fallback - Best of both worlds
+    |
+    | WHY TOKEN CACHING IS ESSENTIAL:
+    | 1. Reduces API calls (most APIs have rate limits)
+    | 2. Improves performance (no auth request for every API call)
+    | 3. Reduces latency (cached token vs network request: 0.001s vs 0.5s)
+    | 4. Cost efficiency (some APIs charge per request)
+    | 5. Better UX (faster response times)
     |
     */
+    'token_storage' => [
+        'enabled' => env('QREDIT_TOKEN_CACHE_ENABLED', true),
+        'strategy' => env('QREDIT_TOKEN_STRATEGY', 'cache'), // cache, database, hybrid
+        'ttl_buffer' => env('QREDIT_TOKEN_TTL_BUFFER', 300), // Refresh 5 min before expiry
+    ],
+
+    // Legacy config (kept for backward compatibility)
     'cache_token' => env('QREDIT_CACHE_TOKEN', true),
 
     /*
@@ -75,7 +128,7 @@ return [
     |
     */
     'webhook' => [
-        'enabled' => env('QREDIT_WEBHOOK_ENABLED', true),
+        'enabled' => env('QREDIT_WEBHOOK_ENABLED', false),
         'path' => env('QREDIT_WEBHOOK_PATH', '/qredit/webhook'),
         'prefix' => env('QREDIT_WEBHOOK_PREFIX', ''),
         'middleware' => [

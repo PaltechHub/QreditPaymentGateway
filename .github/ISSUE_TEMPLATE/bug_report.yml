@@ -1,0 +1,144 @@
+name: 🐛 Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this bug! Please fill out the form below to help us understand and fix the issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Tell us what happened...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: I expected...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Instead, this happened...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      value: |
+        1. Configure the package with '...'
+        2. Call method '...'
+        3. Pass data '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: code-sample
+    attributes:
+      label: Code Sample
+      description: If applicable, provide a minimal code sample that reproduces the issue
+      render: php
+      placeholder: |
+        <?php
+        use Qredit\LaravelQredit\Facades\Qredit;
+
+        // Your code here
+
+  - type: dropdown
+    id: package-version
+    attributes:
+      label: Package Version
+      description: What version of the package are you using?
+      options:
+        - v1.0.0 (latest)
+        - v0.9.x
+        - v0.8.x
+        - Other (specify in additional context)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: laravel-version
+    attributes:
+      label: Laravel Version
+      description: What version of Laravel are you using?
+      options:
+        - Laravel 12.x
+        - Laravel 11.x
+        - Laravel 10.x
+        - Laravel 9.x
+        - Other (specify in additional context)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: php-version
+    attributes:
+      label: PHP Version
+      description: What version of PHP are you using?
+      options:
+        - PHP 8.4
+        - PHP 8.3
+        - PHP 8.2
+        - PHP 8.1
+        - PHP 8.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: Which Qredit environment are you using?
+      options:
+        - Sandbox/Testing
+        - Production
+        - Both
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-output
+    attributes:
+      label: Error Output
+      description: If applicable, paste any error messages or stack traces
+      render: shell
+      placeholder: |
+        Paste error output here...
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here (e.g., logs, screenshots, related issues)
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      description: Please confirm the following
+      options:
+        - label: I have searched the existing issues and this is not a duplicate
+          required: true
+        - label: I have read the documentation
+          required: true
+        - label: I am using the latest version of the package
+          required: false
