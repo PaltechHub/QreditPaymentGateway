@@ -1,0 +1,71 @@
+{
+    "name": "qredit/laravel-qredit",
+    "description": "Laravel integration for Qredit payment gateway using Saloon PHP",
+    "keywords": [
+        "laravel",
+        "payment",
+        "qredit",
+        "gateway",
+        "saloon",
+        "payment-gateway"
+    ],
+    "homepage": "https://github.com/qredit/laravel-qredit",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Qredit Development Team",
+            "email": "dev@qredit.com"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "illuminate/support": "^10.0|^11.0",
+        "illuminate/contracts": "^10.0|^11.0",
+        "saloonphp/saloon": "^3.0",
+        "saloonphp/laravel-plugin": "^3.0",
+        "nesbot/carbon": "^2.0|^3.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^8.0|^9.0",
+        "phpunit/phpunit": "^10.5|^11.0",
+        "mockery/mockery": "^1.6",
+        "laravel/pint": "^1.0",
+        "phpstan/phpstan": "^1.10",
+        "nunomaduro/larastan": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Qredit\\LaravelQredit\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Qredit\\LaravelQredit\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit",
+        "test-coverage": "vendor/bin/phpunit --coverage-html coverage",
+        "format": "vendor/bin/pint",
+        "analyse": "vendor/bin/phpstan analyse"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "phpstan/extension-installer": true
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Qredit\\LaravelQredit\\QreditServiceProvider"
+            ],
+            "aliases": {
+                "Qredit": "Qredit\\LaravelQredit\\Facades\\Qredit"
+            }
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
