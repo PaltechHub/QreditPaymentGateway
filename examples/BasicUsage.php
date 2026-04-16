@@ -1,623 +1,315 @@
 <?php
 
 /**
- * Qredit Laravel SDK v0.1.0 - Basic Usage Examples
+ * Qredit Laravel SDK — Basic Usage Examples
  *
- * This file demonstrates how to use the Qredit payment gateway SDK
- * in your Laravel application with all v0.1.0 features.
+ * Demonstrates the SDK's new, per-tenant API with live HMAC SHA512 signing
+ * (merchant guide §7). Every outgoing request is signed automatically in
+ * BaseQreditRequest::boot() — you never need to compute signatures yourself.
  *
- * Key Features Demonstrated:
- * - Unique Message ID system with microsecond precision
- * - Token management with caching strategies
- * - Comprehensive header management via configuration
- * - Payment requests and orders management
- * - Authorization header handling (HmacSHA512_O)
+ * Key concepts:
+ *  - Qredit::make([...]) builds a per-tenant client (api_key + secret_key).
+ *    Call it once per HTTP request / per queue job so credentials follow the
+ *    current channel / company.
+ *  - The literal "HmacSHA512_O" is the gateway's required Authorization scheme
+ *    prefix (doc §7 step 6). It lives in config/qredit.php ('signing.scheme').
+ *  - Signature case (lower vs upper hex) is configurable per-tenant via
+ *    'signature_case' — the gateway is strict.
  */
 
-use Qredit\LaravelQredit\Facades\Qredit;
-use Qredit\LaravelQredit\Exceptions\QreditException;
-use Qredit\LaravelQredit\Exceptions\QreditAuthenticationException;
 use Qredit\LaravelQredit\Exceptions\QreditApiException;
+use Qredit\LaravelQredit\Exceptions\QreditAuthenticationException;
+use Qredit\LaravelQredit\Exceptions\QreditException;
+use Qredit\LaravelQredit\Facades\Qredit as QreditFacade;
+use Qredit\LaravelQredit\Qredit;
 
-// ===================================================================
-// CONFIGURATION OVERVIEW
-// ===================================================================
+// ===========================================================================
+// 1. BUILDING A CLIENT — SINGLE TENANT
+// ===========================================================================
 
 /**
- * The SDK uses these key configuration values from config/qredit.php:
+ * Simple case: one set of credentials in config/qredit.php.
+ * The facade resolves to a singleton built from config.
+ */
+$token = QreditFacade::authenticate();
+echo "Token (first 20 chars): ".substr($token, 0, 20)."...\n";
+
+// ===========================================================================
+// 2. BUILDING A CLIENT — PER-TENANT (SAAS / MULTI-CHANNEL)
+// ===========================================================================
+
+/**
+ * In a multi-tenant app (Bagisto SAAS, multi-channel, etc.) credentials live
+ * per tenant — not in .env. Build a fresh client per request using Qredit::make().
  *
- * 'client' => [
- *     'type' => 'MP',                    // Client-Type header
- *     'version' => '1.0.0',               // Client-Version header
- *     'authorization' => 'HmacSHA512_O',  // Authorization header
- * ],
- * 'sdk_enabled' => false,  // When false, Authorization header is included
- * 'token_storage' => [
- *     'strategy' => 'cache',  // Options: cache, database, hybrid
- * ]
- *
- * Every request automatically includes a unique message ID with format:
- * {type_prefix}_{microseconds}{random} (e.g., pr_create_123456789abc)
+ * Options:
+ *   api_key         (required)  Public API key.
+ *   secret_key      (required)  Secret API key — used for HMAC SHA512.
+ *   sandbox         (bool)      true → UAT, false → production.
+ *   language        (string)    'EN' | 'AR' for Accept-Language.
+ *   auth_scheme     (string)    Override the Authorization prefix (default from config).
+ *   signature_case  (string)    'lower' | 'upper' — gateway is case-sensitive.
+ *   skip_auth       (bool)      true → don't auto-authenticate on construct.
  */
+$client = Qredit::make([
+    'api_key' => 'EdVfej9DvSSHBCtn0DDUviHxmXMj3t0bodQqjeNXF0',
+    'secret_key' => 'B9E0236B77E5C16B1F3540265920C7E0C541622E66C4F76FBC53BC990F11E496',
+    'sandbox' => true,
+    'language' => 'EN',
+    'signature_case' => 'lower',
+]);
 
-// ===================================================================
-// 1. AUTHENTICATION & TOKEN MANAGEMENT
-// ===================================================================
+// ===========================================================================
+// 3. REGISTER AN ORDER (merchant doc §3)
+// ===========================================================================
 
-/**
- * The SDK automatically handles authentication with intelligent token caching.
- * Token caching strategies reduce API calls by 95%.
- */
 try {
-    // Automatic authentication happens on first API call
-    // Token is cached based on your configured strategy:
-    // - 'cache': Uses Laravel's cache (Redis/Memcached)
-    // - 'database': Stores in database
-    // - 'hybrid': Cache with database fallback
-
-    $token = Qredit::authenticate();
-    echo "Authentication successful. Token cached based on strategy: "
-         . config('qredit.token_storage.strategy') . "\n";
-
-    // Force re-authentication (bypasses cache)
-    $token = Qredit::authenticate(force: true);
-
-} catch (QreditAuthenticationException $e) {
-    echo "Authentication failed: " . $e->getMessage() . "\n";
-    // Check your API key and Authorization header configuration
-}
-
-// ===================================================================
-// 2. CREATING PAYMENT REQUESTS (with Unique Message IDs)
-// ===================================================================
-
-/**
- * Create a payment request with automatic unique message ID generation
- * Message ID format: pr_create_{microseconds}{random}
- */
-try {
-    $paymentRequest = Qredit::createPaymentRequest([
-        'amount' => 150.00,
-        'currencyCode' => config('qredit.default_currency', 'ILS'),
-        'clientReference' => 'ORDER-' . uniqid(),
-        'description' => 'Payment for Order #12345',
-        'customerDetails' => [
-            'customerName' => 'John Doe',
-            'customerEmail' => 'john@example.com',
-            'customerPhone' => '+972501234567',
-            'customerAddress' => '123 Main St, Tel Aviv',
+    $order = $client->createOrder([
+        'amountCents' => 3200,
+        'currencyCode' => 'ILS',
+        'deliveryNeeded' => 'true',
+        'deliveryCostCents' => 200,
+        'shippingProviderCode' => 'DELV2',
+        'clientReference' => 'ORDER-'.uniqid(),
+        'customerInfo' => [
+            'name' => 'Mahmood Ali',
+            'phone' => '+970599882288',
+            'email' => 'mahmood.ali@example.com',
+            'idNumber' => '8923982392',
         ],
-        'callbackUrls' => [
-            'successUrl' => 'https://yoursite.com/payment/success',
-            'failureUrl' => 'https://yoursite.com/payment/failure',
-            'cancelUrl' => 'https://yoursite.com/payment/cancel',
-            'webhookUrl' => 'https://yoursite.com/qredit/webhook',
+        'shippingData' => [
+            'countryCode' => 'PSE',
+            'cityCode' => '50',
+            'areaCode' => '50',
+            'street' => "Jemma'in",
+            'postalCode' => '970',
+            'building' => 'Bab wad',
+            'apartment' => '01',
+            'floor' => '07',
         ],
         'items' => [
-            [
-                'name' => 'Product A',
-                'quantity' => 2,
-                'price' => 50.00,
-                'description' => 'Premium subscription'
-            ],
-            [
-                'name' => 'Shipping',
-                'quantity' => 1,
-                'price' => 50.00,
-                'description' => 'Express delivery'
-            ]
-        ],
-        'metadata' => [
-            'order_id' => '12345',
-            'customer_type' => 'premium',
+            ['name' => 'xbox', 'amountCents' => 2000, 'quantity' => 1, 'sku' => '21111'],
+            ['name' => 'playstation', 'amountCents' => 1200, 'quantity' => 1, 'sku' => '1221'],
         ],
     ]);
 
-    echo "Payment request created successfully!\n";
-    echo "Reference: " . $paymentRequest['reference'] . "\n";
-    echo "Message ID (unique): " . $paymentRequest['msgId'] . "\n";
-    echo "Checkout URL: " . $paymentRequest['checkoutUrl'] . "\n";
-
-    // The request included these headers automatically:
-    // - Client-Type: MP
-    // - Client-Version: 1.0.0
-    // - Authorization: HmacSHA512_O (if sdk_enabled = false)
-    // - Accept-Language: EN
-
-    // Redirect user to payment page
-    // return redirect($paymentRequest['checkoutUrl']);
-
+    $orderReference = $order['records'][0]['orderReference'] ?? null;
+    echo "Order created: {$orderReference}\n";
 } catch (QreditApiException $e) {
-    echo "API Error: " . $e->getMessage() . "\n";
-    echo "Error Code: " . $e->getCode() . "\n";
+    echo "createOrder failed: ".$e->getMessage()." (code {$e->getCode()})\n";
     print_r($e->getResponse());
 }
 
-// ===================================================================
-// 3. LISTING PAYMENT REQUESTS
-// ===================================================================
-
-/**
- * List payment requests with filters
- * Message ID format: pr_list_{microseconds}{random}
- */
-$paymentRequests = Qredit::listPaymentRequests([
-    'dateFrom' => '01/12/2024',
-    'dateTo' => '31/12/2024',
-    'status' => 'SUCCESS',
-    'currencyCode' => 'ILS',
-    'max' => 50,
-    'offset' => 0,
-]);
-
-foreach ($paymentRequests['data'] as $request) {
-    echo "Payment: {$request['reference']} - ";
-    echo "Status: {$request['status']} - ";
-    echo "Amount: {$request['amount']} - ";
-    echo "MsgId: {$request['msgId']}\n";  // Each has unique message ID
-}
-
-// ===================================================================
-// 4. GETTING PAYMENT REQUEST DETAILS
-// ===================================================================
-
-/**
- * Get details of a specific payment request
- * Message ID format: pr_get_{microseconds}{random}
- */
-$paymentId = 'PR_123456789';
+// ===========================================================================
+// 4. CREATE A PAYMENT REQUEST (merchant doc §4)
+// ===========================================================================
 
 try {
-    $payment = Qredit::getPaymentRequest($paymentId);
-
-    echo "Payment Details:\n";
-    echo "Reference: " . $payment['reference'] . "\n";
-    echo "Message ID: " . $payment['msgId'] . "\n";  // Unique for this request
-    echo "Status: " . $payment['status'] . "\n";
-    echo "Amount: " . $payment['amount'] . " " . $payment['currencyCode'] . "\n";
-    echo "Customer: " . $payment['customerName'] . "\n";
-    echo "Created: " . $payment['createdDate'] . "\n";
-
-    if ($payment['status'] === 'SUCCESS') {
-        echo "Payment completed successfully!\n";
-    }
-
-} catch (QreditApiException $e) {
-    if ($e->getCode() === 404) {
-        echo "Payment request not found\n";
-    } else {
-        echo "Error: " . $e->getMessage() . "\n";
-    }
-}
-
-// ===================================================================
-// 5. UPDATING PAYMENT REQUESTS
-// ===================================================================
-
-/**
- * Update an existing payment request
- * Message ID format: pr_update_{microseconds}{random}
- */
-try {
-    $updatedPayment = Qredit::updatePaymentRequest($paymentId, [
-        'description' => 'Updated payment description',
-        'amount' => 200.00,
-        'customerDetails' => [
-            'customerEmail' => 'newemail@example.com',
+    $payment = $client->createPayment([
+        'orderReference' => $orderReference,
+        'amountCents' => 3200,
+        'currencyCode' => 'ILS',
+        'lockOrderWhenPaid' => true,
+        'paymentChannels' => [
+            ['code' => 'CSAB'],
+            ['code' => 'esadad_biller'],
+            ['code' => 'NC-QR'],
+        ],
+        'customerInfo' => [
+            'name' => 'Mahmood Ali',
+            'phoneNumber' => '+970599882288',
+            'email' => 'mahmood.ali@example.com',
+            'idNumber' => '8923982392',
+        ],
+        'billingData' => [
+            'countryCode' => 'PSE',
+            'city' => '50',
+            'area' => '50',
+            'street' => "Jemma'in",
+            'postalCode' => '970',
+            'state' => 'West Bank',
+            'building' => 'Bab wad',
+            'apartment' => '01',
+            'floor' => '07',
         ],
     ]);
 
-    echo "Payment request updated successfully\n";
-    echo "New Message ID: " . $updatedPayment['msgId'] . "\n";
-
+    $paymentReference = $payment['records'][0]['reference'] ?? null;
+    $checkoutUrl = $payment['records'][0]['url'] ?? null;
+    echo "Payment request: {$paymentReference}\n";
+    echo "Checkout URL:    {$checkoutUrl}\n";
 } catch (QreditApiException $e) {
-    echo "Failed to update: " . $e->getMessage() . "\n";
+    echo "createPayment failed: ".$e->getMessage()."\n";
 }
 
-// ===================================================================
-// 6. CANCELING PAYMENT REQUESTS
-// ===================================================================
+// ===========================================================================
+// 5. LIST / GET / UPDATE / CANCEL
+// ===========================================================================
 
-/**
- * Cancel a payment request with optional reason
- * Message ID format: pr_cancel_{microseconds}{random}
- */
-try {
-    // Cancel without reason
-    $result = Qredit::cancelPaymentRequest($paymentId);
-
-    // Or cancel with reason
-    $result = Qredit::cancelPaymentRequest($paymentId, 'Customer request');
-
-    echo "Payment request canceled successfully\n";
-    echo "Cancellation Message ID: " . $result['msgId'] . "\n";
-
-} catch (QreditApiException $e) {
-    echo "Failed to cancel: " . $e->getMessage() . "\n";
-}
-
-// ===================================================================
-// 7. CREATING ORDERS
-// ===================================================================
-
-/**
- * Create an order (alternative to payment request)
- * Message ID format: ord_create_{microseconds}{random}
- */
-$order = Qredit::createOrder([
-    'orderReference' => 'ORDER-' . time(),
-    'amount' => 300.00,
-    'currencyCode' => 'ILS',
-    'description' => 'Purchase Order #54321',
-    'customerDetails' => [
-        'name' => 'Jane Smith',
-        'email' => 'jane@example.com',
-        'phone' => '+972509876543',
-    ],
-    'billingAddress' => [
-        'line1' => '456 King St',
-        'city' => 'Jerusalem',
-        'countryCode' => 'IL',
-        'postalCode' => '91000',
-    ],
-    'shippingAddress' => [
-        'line1' => '789 Queen St',
-        'city' => 'Haifa',
-        'countryCode' => 'IL',
-        'postalCode' => '31000',
-    ],
-    'metadata' => [
-        'internal_order_id' => '12345',
-        'customer_type' => 'premium',
-    ],
-]);
-
-echo "Order created: " . $order['orderReference'] . "\n";
-echo "Order Message ID: " . $order['msgId'] . "\n";
-
-// ===================================================================
-// 8. ORDER MANAGEMENT
-// ===================================================================
-
-/**
- * List orders with filters
- * Message ID format: ord_list_{microseconds}{random}
- */
-$orders = Qredit::listOrders([
-    'dateFrom' => '01/12/2024',
-    'dateTo' => '31/12/2024',
-    'status' => 'PENDING',
+// List payments — dateFrom/dateTo default to last 30 days if you omit them.
+$list = $client->listPayments([
     'max' => 20,
+    'offset' => 0,
+    'status' => 'PENDING_PAYMENT',
 ]);
 
-foreach ($orders['data'] as $order) {
-    echo "Order: {$order['orderReference']} - MsgId: {$order['msgId']}\n";
+foreach ($list['records'] ?? [] as $pr) {
+    echo "Payment: {$pr['reference']} status={$pr['paymentRequestStatus']}\n";
 }
 
-/**
- * Get order details
- * Message ID format: ord_get_{microseconds}{random}
- */
-$orderId = 'ORD_123456789';
-$orderDetails = Qredit::getOrder($orderId);
-echo "Order Status: " . $orderDetails['status'] . "\n";
+// Get a single payment by reference (implemented via list + filter).
+$single = $client->getPayment($paymentReference);
 
-/**
- * Update order
- * Message ID format: ord_update_{microseconds}{random}
- */
-$updatedOrder = Qredit::updateOrder($orderId, [
-    'description' => 'Updated order description',
-    'amount' => 350.00,
+// Update a payment.
+$client->updatePayment($paymentReference, [
+    'amountCents' => 4000,
+    'currencyCode' => 'ILS',
 ]);
 
+// Cancel.
+$client->deletePayment($paymentReference, 'Customer cancelled');
+
+// Same shape for orders:
+$client->listOrders(['orderStatus' => 'NEW']);
+$client->getOrder($orderReference);
+$client->updateOrder($orderReference, ['deliveryNeeded' => 'false']);
+$client->cancelOrder($orderReference, 'Out of stock');
+
+// ===========================================================================
+// 6. SPECIALIZED PAYMENT-REQUEST CALLS
+// ===========================================================================
+
+// Generate a QR for a payment request.
+$qr = $client->generateQR([
+    'reference' => $paymentReference,
+    'productCode' => 'NC-QR',
+    'merchantChannelMedia' => 'SCREEN_ELECTRONIC_WEBSITE',
+]);
+
+// Calculate fees before charging.
+$fees = $client->calculateFees([
+    'reference' => $paymentReference,
+    'productCode' => 'CSAB',
+]);
+
+// Initiate a payment for a specific channel.
+$init = $client->initPayment([
+    'reference' => $paymentReference,
+    'productCode' => 'CSAB',
+]);
+
+// ===========================================================================
+// 7. TRANSACTIONS + CLEARING
+// ===========================================================================
+
+$txns = $client->listTransactions([
+    'transactionStatus' => 'SUCCESS',
+    'currencyCode' => 'ILS',
+]);
+
+// Change the clearing status of a payment.
+$client->changeClearingStatus([
+    'encodedId' => 'txn_encoded_id',
+    'clearingStatus' => 'CLEARED',
+    'statusReason' => 'Settled with provider',
+]);
+
+// ===========================================================================
+// 8. CUSTOMERS
+// ===========================================================================
+
+$customers = $client->listCustomers([
+    'email' => 'mahmood.ali@',
+    'max' => 10,
+]);
+
+// ===========================================================================
+// 9. WEBHOOK HANDLING
+// ===========================================================================
+
 /**
- * Cancel order with reason
- * Message ID format: ord_cancel_{microseconds}{random}
+ * In your webhook controller, verify the inbound signature against the SAME
+ * secret you used to sign outgoing requests. Per merchant doc the callback is
+ * signed identically to requests (HMAC SHA512 over sorted payload values,
+ * key = md5(secret + msgId)).
  */
-$cancelResult = Qredit::cancelOrder($orderId, 'Out of stock');
-echo "Order canceled with MsgId: " . $cancelResult['msgId'] . "\n";
-
-// ===================================================================
-// 9. WEBHOOK HANDLING WITH SIGNATURE VERIFICATION
-// ===================================================================
-
-/**
- * Handle incoming webhooks from Qredit
- * Webhooks include signature verification for security
- */
-
-// In your webhook controller:
-class QreditWebhookController extends Controller
+class QreditWebhookController
 {
-    public function handle(Request $request)
+    public function handle(\Illuminate\Http\Request $request): \Illuminate\Http\JsonResponse
     {
-        try {
-            // Get the signature from headers
-            $signature = $request->header('X-Qredit-Signature');
-
-            // Process the webhook with signature verification
-            $result = Qredit::processWebhook(
-                $request->all(),
-                $signature
-            );
-
-            // Each webhook has a unique message ID
-            Log::info('Webhook received', [
-                'msgId' => $result['msgId'],
-                'event' => $result['event'],
-            ]);
-
-            // Handle different event types
-            switch ($result['event']) {
-                case 'payment.success':
-                    $this->handlePaymentSuccess($result['data']);
-                    break;
-
-                case 'payment.failed':
-                    $this->handlePaymentFailed($result['data']);
-                    break;
-
-                case 'payment.refunded':
-                    $this->handlePaymentRefunded($result['data']);
-                    break;
-
-                case 'order.completed':
-                    $this->handleOrderCompleted($result['data']);
-                    break;
-
-                default:
-                    Log::info('Unknown webhook event', $result);
-            }
-
-            return response()->json(['status' => 'success']);
-
-        } catch (QreditException $e) {
-            Log::error('Webhook processing failed', [
-                'error' => $e->getMessage(),
-                'payload' => $request->all(),
-            ]);
-
-            return response()->json(['error' => 'Invalid webhook'], 400);
-        }
-    }
-
-    private function handlePaymentSuccess($data)
-    {
-        // Update order status in database
-        Order::where('reference', $data['clientReference'])
-            ->update(['status' => 'paid']);
-
-        // Each action has unique message ID in logs
-        Log::info('Payment success processed', [
-            'msgId' => $data['msgId'],
-            'reference' => $data['clientReference'],
+        $client = Qredit::make([
+            'api_key' => config('qredit.api_key'),
+            'secret_key' => config('qredit.secret_key'),
+            'sandbox' => config('qredit.sandbox'),
+            'skip_auth' => true,
         ]);
+
+        try {
+            $result = $client->processWebhook(
+                $request->all(),
+                $request->header('Authorization'),
+            );
+        } catch (QreditException $e) {
+            \Log::warning('Qredit webhook rejected', ['error' => $e->getMessage()]);
+
+            return response()->json(['status' => 'invalid'], 401);
+        }
+
+        match ($result['event']) {
+            'payment.succeeded', 'transaction' => $this->markPaid($result['data']),
+            'payment.failed' => $this->markFailed($result['data']),
+            default => \Log::info('Unhandled Qredit event', $result),
+        };
+
+        return response()->json(['status' => 'RECEIVED']);
     }
+
+    protected function markPaid(array $data): void { /* your logic */ }
+
+    protected function markFailed(array $data): void { /* your logic */ }
 }
 
-// ===================================================================
-// 10. TOKEN CACHING STRATEGIES
-// ===================================================================
+// ===========================================================================
+// 10. ERROR HANDLING
+// ===========================================================================
 
-/**
- * The SDK intelligently caches tokens based on your configuration
- */
-
-// Strategy 1: Cache (default) - Best for single server
-config(['qredit.token_storage.strategy' => 'cache']);
-// Uses Laravel's cache driver (Redis, Memcached, etc.)
-// Fastest performance for single-server deployments
-
-// Strategy 2: Database - Best for multi-server
-config(['qredit.token_storage.strategy' => 'database']);
-// Stores tokens in database for shared access across servers
-// Ensures consistency in distributed environments
-
-// Strategy 3: Hybrid - Best of both worlds
-config(['qredit.token_storage.strategy' => 'hybrid']);
-// Primary: Cache for speed
-// Fallback: Database for reliability
-// Ideal for high-performance distributed systems
-
-// Token TTL buffer (default 300 seconds)
-config(['qredit.token_storage.ttl_buffer' => 300]);
-// Refreshes token 5 minutes before expiry
-// Prevents authentication failures during requests
-
-// ===================================================================
-// 11. HEADER CONFIGURATION
-// ===================================================================
-
-/**
- * Headers are configured in config/qredit.php and automatically
- * included in every request via BaseQreditRequest
- */
-
-// Client headers (always included)
-echo "Client-Type: " . config('qredit.client.type') . "\n";        // MP
-echo "Client-Version: " . config('qredit.client.version') . "\n";  // 1.0.0
-
-// Authorization header (conditional)
-if (!config('qredit.sdk_enabled')) {
-    echo "Authorization: " . config('qredit.client.authorization') . "\n"; // HmacSHA512_O
-    echo "Authorization header is included in all requests\n";
-} else {
-    echo "SDK mode enabled - Authorization header not included\n";
-}
-
-// Language header
-echo "Accept-Language: " . config('qredit.language') . "\n";  // EN or AR
-
-// ===================================================================
-// 12. ERROR HANDLING WITH RETRY LOGIC
-// ===================================================================
-
-/**
- * The SDK includes automatic retry with exponential backoff
- */
 try {
-    // Automatic retry is configured in config/qredit.php
-    // 'retry' => [
-    //     'enabled' => true,
-    //     'max_attempts' => 3,
-    //     'delay' => 1000,  // milliseconds
-    // ]
-
-    $payment = Qredit::createPaymentRequest([
-        'amount' => 100.00,
-        'currencyCode' => 'ILS',
-        'clientReference' => 'RETRY-TEST-' . uniqid(),
-        // ... other data
-    ]);
-
-    // If request fails, SDK automatically retries up to 3 times
-    // with exponential backoff (1s, 2s, 4s)
-
+    $client->createPayment(['amountCents' => -10]); // Invalid
 } catch (QreditAuthenticationException $e) {
-    // Authentication issues - token expired or invalid
-    Log::error('Authentication failed: ' . $e->getMessage());
-
-    // Force re-authentication to get new token
-    Qredit::authenticate(force: true);
-
+    // 401 — token expired or invalid. The client auto-refreshes once on 401
+    // internally (sendWithRetry), so if you see this the second attempt also failed.
 } catch (QreditApiException $e) {
-    // API errors after retry attempts exhausted
-    $errorCode = $e->getCode();
-
-    switch ($errorCode) {
-        case 400:
-            Log::error('Validation error after retries', $e->getResponse());
-            break;
-
-        case 429:
-            Log::warning('Rate limit exceeded even after retries');
-            break;
-
-        case 500:
-            Log::critical('Server error persisted through retries');
-            break;
-    }
+    // Every non-2xx response. $e->getResponse() carries the decoded body.
+    $body = $e->getResponse();
+    echo "Gateway said: {$body['message']} (code {$body['code']})\n";
+} catch (QreditException $e) {
+    // SDK-level errors (missing credentials, etc).
 }
 
-// ===================================================================
-// 13. TESTING IN SANDBOX ENVIRONMENT
-// ===================================================================
+// ===========================================================================
+// 11. CLI TESTER (qredit:call) — THE POSTMAN REPLACEMENT
+// ===========================================================================
 
 /**
- * Testing with sandbox environment
+ * Because every request needs an HMAC signature, Postman / Insomnia aren't
+ * practical. The SDK ships an Artisan command that signs + sends any endpoint:
+ *
+ *   # List supported methods:
+ *   php artisan qredit:call --list
+ *
+ *   # Live call:
+ *   php artisan qredit:call auth \
+ *       --api-key=$QREDIT_API_KEY --secret-key=$QREDIT_SECRET_KEY --sandbox
+ *
+ *   # Dry run (prints signature + request without sending):
+ *   php artisan qredit:call create-order --dry-run \
+ *       --secret-key=... \
+ *       --payload='{"amountCents":3200,"currencyCode":"ILS"}'
+ *
+ *   # Payload from file:
+ *   php artisan qredit:call create-payment \
+ *       --payload-file=./tests/fixtures/payment.json
+ *
+ *   # Flip signature hex case (gateway is strict):
+ *   php artisan qredit:call auth --case=upper --api-key=... --secret-key=...
  */
-
-// Ensure sandbox mode is enabled
-config(['qredit.sandbox' => true]);
-
-// Create test payment with unique message ID
-$testPayment = Qredit::createPaymentRequest([
-    'amount' => 10.00,
-    'currencyCode' => 'ILS',
-    'clientReference' => 'TEST-' . uniqid(),
-    'description' => 'Sandbox test payment',
-    'customerDetails' => [
-        'customerName' => 'Test User',
-        'customerEmail' => 'test@example.com',
-    ],
-    'testMode' => true,
-]);
-
-echo "Test payment created in sandbox\n";
-echo "Message ID: " . $testPayment['msgId'] . "\n";
-echo "Checkout URL: " . $testPayment['checkoutUrl'] . "\n";
-
-// Test webhook signature verification
-$testWebhookPayload = [
-    'event' => 'payment.success',
-    'msgId' => 'webhook_' . microtime(true),
-    'data' => [
-        'paymentId' => $testPayment['id'],
-        'status' => 'SUCCESS',
-    ],
-];
-
-$webhookSecret = config('qredit.webhook.secret');
-$testSignature = hash_hmac('sha512', json_encode($testWebhookPayload), $webhookSecret);
-
-// Verify signature
-$isValid = Qredit::verifyWebhookSignature($testWebhookPayload, $testSignature);
-echo "Webhook signature valid: " . ($isValid ? 'Yes' : 'No') . "\n";
-
-// ===================================================================
-// 14. MONITORING & DEBUGGING
-// ===================================================================
-
-/**
- * Enable debug mode to log all API requests/responses
- */
-
-// Enable debug logging
-config(['qredit.debug' => true]);
-config(['qredit.logging.level' => 'debug']);
-
-// All requests will now be logged with full details
-$debugPayment = Qredit::createPaymentRequest([
-    'amount' => 50.00,
-    'currencyCode' => 'ILS',
-    'clientReference' => 'DEBUG-' . uniqid(),
-    // ... other data
-]);
-
-// Check logs for:
-// - Request headers (including Client-Type, Client-Version, Authorization)
-// - Request body with unique message ID
-// - Response data
-// - Token caching operations
-// - Retry attempts
-
-// Disable debug mode for production
-config(['qredit.debug' => false]);
-
-// ===================================================================
-// 15. UNIQUE MESSAGE ID TRACKING
-// ===================================================================
-
-/**
- * Every API request has a unique message ID for tracking
- * Format: {type}_{microseconds}{random}
- */
-
-// Message ID prefixes by request type:
-$messageIdPrefixes = [
-    'Authentication' => 'auth_token_',
-    'Create Payment' => 'pr_create_',
-    'Get Payment' => 'pr_get_',
-    'Update Payment' => 'pr_update_',
-    'Cancel Payment' => 'pr_cancel_',
-    'List Payments' => 'pr_list_',
-    'Create Order' => 'ord_create_',
-    'Get Order' => 'ord_get_',
-    'Update Order' => 'ord_update_',
-    'Cancel Order' => 'ord_cancel_',
-    'List Orders' => 'ord_list_',
-];
-
-// Track requests using message IDs
-$payment = Qredit::createPaymentRequest([
-    'amount' => 100.00,
-    'currencyCode' => 'ILS',
-    'clientReference' => 'TRACK-' . uniqid(),
-]);
-
-// Log with message ID for tracking
-Log::info('Payment request created', [
-    'msgId' => $payment['msgId'],  // e.g., pr_create_173567890abc
-    'reference' => $payment['clientReference'],
-    'amount' => $payment['amount'],
-]);
-
-// Use message ID to track request through entire lifecycle
-// - API logs
-// - Webhook callbacks
-// - Error tracking
-// - Customer support
-
-echo "Payment tracking ID: " . $payment['msgId'] . "\n";
-echo "Use this ID to track the request in all systems\n";

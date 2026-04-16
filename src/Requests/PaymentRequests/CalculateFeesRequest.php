@@ -11,12 +11,11 @@ use Saloon\Enums\Method;
 use Saloon\Traits\Body\HasJsonBody;
 
 /**
- * POST /paymentRequests — merchant doc §4.
+ * POST /paymentRequests/calculateFees — swagger.
  *
- * Caller provides the full body (amountCents, currencyCode, orderReference,
- * customerInfo, billingData, paymentChannels, ...). We inject msgId.
+ * Body: { msgId, reference, productCode }.
  */
-class CreatePaymentRequest extends BaseQreditRequest implements HasBody
+class CalculateFeesRequest extends BaseQreditRequest implements HasBody
 {
     use HasJsonBody;
     use HasMessageId;
@@ -28,12 +27,12 @@ class CreatePaymentRequest extends BaseQreditRequest implements HasBody
     public function __construct(array $data)
     {
         $this->data = $data;
-        $this->messageIdType = 'payment.create';
+        $this->messageIdType = 'payment.fees';
     }
 
     public function resolveEndpoint(): string
     {
-        return '/paymentRequests';
+        return '/paymentRequests/calculateFees';
     }
 
     protected function defaultBody(): array
@@ -42,18 +41,5 @@ class CreatePaymentRequest extends BaseQreditRequest implements HasBody
             ['msgId' => $this->generateMessageId()],
             $this->data,
         );
-    }
-
-    protected function getMessageIdContext(): array
-    {
-        if (isset($this->data['clientReference'])) {
-            return ['ref' => $this->data['clientReference']];
-        }
-
-        if (isset($this->data['orderReference'])) {
-            return ['ref' => $this->data['orderReference']];
-        }
-
-        return [];
     }
 }

@@ -1,343 +1,422 @@
-# Qredit Payment Gateway Laravel SDK v0.1.1
+# Qredit Laravel SDK
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/qredit/laravel-qredit.svg?style=flat-square)](https://packagist.org/packages/qredit/laravel-qredit)
-[![Total Downloads](https://img.shields.io/packagist/dt/qredit/laravel-qredit.svg?style=flat-square)](https://packagist.org/packages/qredit/laravel-qredit)
-[![License](https://img.shields.io/packagist/l/qredit/laravel-qredit.svg?style=flat-square)](https://packagist.org/packages/qredit/laravel-qredit)
+[![License](https://img.shields.io/packagist/l/qredit/laravel-qredit.svg?style=flat-square)](LICENSE.md)
 
-Enterprise-grade Laravel SDK for integrating with the Qredit Payment Gateway. Built with Saloon v3, featuring unique message ID generation, advanced token caching, and comprehensive header management.
+Production-ready Laravel SDK for the **Qredit / BlockBuilders payment gateway**. Built with multi-tenant SAAS deployments as a first-class concern.
 
-## 🚀 Key Features
+- ✅ Every Qredit API endpoint wrapped (auth, orders, payment requests, QR, fees, init, customers, transactions, clearing)
+- ✅ Automatic HMAC-SHA512 signing (merchant guide §7) — you never compute a signature yourself
+- ✅ Per-tenant credentials — swap API keys per-request via a pluggable `CredentialProvider`
+- ✅ Ready-made `/sign` and `/webhook` endpoints (one-line route macros)
+- ✅ Per-tenant token cache (95% fewer auth calls), transparent refresh on 401
+- ✅ `FakeQredit` test double + `qredit:call` CLI (the Postman replacement)
+- ✅ Built on [Saloon](https://docs.saloon.dev/) v3 — full middleware / mock-client support
 
-- **Unique Message ID System** - Every request has a guaranteed unique ID with microsecond precision
-- **Advanced Token Management** - Three caching strategies (cache, database, hybrid) reducing API calls by 95%
-- **Comprehensive Header Management** - Centralized header configuration via BaseQreditRequest
-- **Full API Coverage** - Payment requests, orders, authentication, and more
-- **Multi-Environment Support** - Seamless sandbox/production switching
-- **Laravel 10/11/12 Support** - Compatible with latest Laravel versions
-- **PHP 8.1-8.4 Support** - Works with all modern PHP versions
-- **PEST Testing** - Modern testing framework with comprehensive test suite
-- **Webhook Handling** - Secure signature verification for callbacks
-- **Automatic Retry Logic** - Exponential backoff for failed requests
+> **Status (current):** SDK is feature-complete (70 unit tests passing). Live UAT auth currently blocked on Qredit-side credential provisioning — see [docs/QREDIT_SIGNATURE_ISSUE.md](docs/QREDIT_SIGNATURE_ISSUE.md). The signer is verified correct against the merchant guide and via `openssl dgst` cross-checks; the moment Qredit issues working keys, the entire SDK + Bagisto integration goes live with no code changes.
 
-## 📋 Requirements
+---
 
-- PHP 8.1, 8.2, 8.3, or 8.4
-- Laravel 10.x, 11.x, or 12.x
-- Composer 2.0 or higher
-- Saloon v3
+## Table of contents
 
-## 📦 Installation
+- [Installation](#installation)
+- [Quick start — single tenant](#quick-start--single-tenant)
+- [Multi-tenant usage](#multi-tenant-usage)
+- [API surface](#api-surface)
+- [Webhook handling](#webhook-handling)
+- [The checkout widget's `/sign` endpoint](#the-checkout-widgets-sign-endpoint)
+- [Testing with `FakeQredit`](#testing-with-fakeqredit)
+- [CLI — `qredit:call`](#cli--qreditcall)
+- [Configuration reference](#configuration-reference)
+- [Troubleshooting](#troubleshooting)
+- [Documentation](#documentation)
 
-Install the package via composer:
+---
+
+## Installation
 
 ```bash
 composer require qredit/laravel-qredit
+php artisan qredit:install
 ```
 
-## ⚙️ Configuration
+The installer publishes `config/qredit.php` and prints the next-step checklist for your topology (single-tenant by default; pass `--tenancy` for multi-tenant instructions).
 
-Publish the configuration file:
+**Requirements**
+- PHP 8.1+ — 8.3 tested, 8.4 supported
+- Laravel 10.x / 11.x / 12.x
+- Saloon v3
 
-```bash
-php artisan vendor:publish --provider="Qredit\LaravelQredit\QreditServiceProvider" --tag="config"
-```
+---
 
-### Environment Variables
+## Quick start — single tenant
 
-Add these to your `.env` file:
+Add your credentials to `.env`:
 
 ```env
-# Required
-QREDIT_API_KEY=your-api-key-here
-
-# Environment Settings
+QREDIT_API_KEY=EdVfej9D...
+QREDIT_SECRET_KEY=B9E0236B...
 QREDIT_SANDBOX=true
-QREDIT_SANDBOX_URL=http://185.57.122.58:2030/gw-checkout/api/v1
-QREDIT_PRODUCTION_URL=https://api.qredit.com/gw-checkout/api/v1
-QREDIT_LANGUAGE=EN                    # EN or AR
-
-# Client Headers Configuration
-QREDIT_CLIENT_TYPE=MP
-QREDIT_CLIENT_VERSION=1.0.0
-QREDIT_CLIENT_AUTHORIZATION=HmacSHA512_O
-
-# SDK Mode (false = Authorization header included)
-QREDIT_SDK_ENABLED=false
-
-# Token Storage Strategy
-QREDIT_TOKEN_CACHE_ENABLED=true
-QREDIT_TOKEN_STRATEGY=cache           # cache, database, or hybrid
-QREDIT_TOKEN_TTL_BUFFER=300           # 5 minutes before expiry
-
-# Webhook Configuration
-QREDIT_WEBHOOK_ENABLED=true
-QREDIT_WEBHOOK_PATH=/qredit/webhook
-QREDIT_WEBHOOK_SECRET=your-webhook-secret
-
-# Debug & Logging
-QREDIT_DEBUG=false
+QREDIT_SANDBOX_URL=https://apitest.qredit.tech/gw-checkout/api/v1
+QREDIT_PRODUCTION_URL=https://api.qredit.tech/gw-checkout/api/v1
+QREDIT_SIGNATURE_CASE=lower     # flip to 'upper' if the gateway rejects lowercase
 ```
 
-## Basic Usage
+Register the ready-made endpoints in `routes/web.php`:
 
-### Initialize the Client
+```php
+use Illuminate\Support\Facades\Route;
+
+Route::qreditSign();        // POST /qredit/sign
+Route::qreditWebhook();     // POST /qredit/webhook
+```
+
+Use the facade anywhere:
 
 ```php
 use Qredit\LaravelQredit\Facades\Qredit;
 
-// Using the facade (recommended)
-$response = Qredit::createCheckout([
-    'amount' => 100.00,
-    'currency' => 'ILS',
-    'reference' => 'ORDER-123',
-    'description' => 'Payment for Order #123',
-    'customer' => [
-        'email' => 'customer@example.com',
-        'name' => 'John Doe',
-        'phone' => '+972501234567',
+$order = Qredit::createOrder([
+    'amountCents'         => 3200,
+    'currencyCode'        => 'ILS',
+    'deliveryNeeded'      => 'true',
+    'deliveryCostCents'   => 200,
+    'shippingProviderCode'=> 'DELV2',
+    'clientReference'     => 'ORDER-2026-001',
+    'customerInfo'        => [
+        'name'  => 'Jane Doe',
+        'phone' => '+970599785833',
+        'email' => 'jane@example.com',
     ],
-    'success_url' => 'https://yoursite.com/payment/success',
-    'failure_url' => 'https://yoursite.com/payment/failure',
-    'cancel_url' => 'https://yoursite.com/payment/cancel',
-]);
-
-// Or using dependency injection
-use Qredit\LaravelQredit\Qredit;
-
-public function __construct(private Qredit $qredit)
-{
-}
-
-public function processPayment()
-{
-    $response = $this->qredit->createCheckout([...]);
-}
-```
-
-### Creating a Checkout Session
-
-```php
-$checkout = Qredit::createCheckout([
-    'amount' => 250.50,
-    'currency' => 'ILS',
-    'reference' => 'INV-2024-001',
-    'description' => 'Invoice Payment',
-    'customer' => [
-        'email' => 'john@example.com',
-        'name' => 'John Doe',
-        'phone' => '+972501234567',
-        'address' => [
-            'line1' => '123 Main St',
-            'city' => 'Tel Aviv',
-            'country' => 'IL',
-            'postal_code' => '12345',
-        ],
+    'shippingData' => [
+        'countryCode' => 'PSE',
+        'cityCode'    => '50',
+        'areaCode'    => '50',
+        'street'      => "Jemma'in",
+        'postalCode'  => '970',
     ],
     'items' => [
-        [
-            'name' => 'Product 1',
-            'quantity' => 2,
-            'price' => 100.00,
-        ],
-        [
-            'name' => 'Shipping',
-            'quantity' => 1,
-            'price' => 50.50,
-        ],
+        ['name' => 'Widget', 'amountCents' => 2000, 'quantity' => 1, 'sku' => 'W-001'],
+        ['name' => 'Gadget', 'amountCents' => 1200, 'quantity' => 1, 'sku' => 'G-002'],
     ],
-    'metadata' => [
-        'order_id' => '123',
-        'customer_id' => '456',
-    ],
-    'success_url' => route('payment.success'),
-    'failure_url' => route('payment.failure'),
-    'cancel_url' => route('payment.cancel'),
-    'webhook_url' => route('qredit.webhook'),
 ]);
 
-// Redirect user to payment page
-return redirect($checkout->checkout_url);
+$orderReference = $order['records'][0]['orderReference'];
+
+$payment = Qredit::createPayment([
+    'orderReference'    => $orderReference,
+    'amountCents'       => 3200,
+    'currencyCode'      => 'ILS',
+    'lockOrderWhenPaid' => true,
+    'paymentChannels'   => [['code' => 'CSAB'], ['code' => 'NC-QR']],
+    'customerInfo'      => [/* ... */],
+    'billingData'       => [/* ... */],
+]);
+
+$checkoutUrl = $payment['records'][0]['url'];
+return redirect($checkoutUrl);
 ```
 
-### Retrieving a Transaction
+Every outgoing request is automatically signed with the correct `Authorization: HmacSHA512_O <hex>` header per merchant guide §7. You don't compute anything by hand.
+
+---
+
+## Multi-tenant usage
+
+The SDK ships with two contracts you bind to your app's tenancy layer:
+
+| Contract | Responsibility |
+|---|---|
+| [`CredentialProvider`](src/Contracts/CredentialProvider.php) | Given a tenant id, return that tenant's Qredit credentials. |
+| [`TenantResolver`](src/Contracts/TenantResolver.php) | Given an HTTP request, return the current tenant id. |
+
+### 1. Implement `CredentialProvider`
 
 ```php
-$transaction = Qredit::getTransaction('TXN_123456');
+namespace App\Qredit;
 
-if ($transaction->isSuccessful()) {
-    // Payment was successful
-    $amount = $transaction->amount;
-    $reference = $transaction->reference;
-    $status = $transaction->status;
+use Qredit\LaravelQredit\Contracts\CredentialProvider;
+use Qredit\LaravelQredit\Tenancy\QreditCredentials;
+use App\Models\Tenant;
+
+class DbCredentialProvider implements CredentialProvider
+{
+    public function credentialsFor(?string $tenantId = null): QreditCredentials
+    {
+        $tenantId = $tenantId ?? app('current.tenant.id');
+        $tenant   = Tenant::findOrFail($tenantId);
+
+        return new QreditCredentials(
+            apiKey:    $tenant->qredit_api_key,
+            secretKey: decrypt($tenant->qredit_secret_key),
+            sandbox:   $tenant->qredit_sandbox,
+            language:  $tenant->language_code,
+            tenantId:  (string) $tenantId,
+        );
+    }
+
+    public function isConfiguredFor(?string $tenantId = null): bool
+    {
+        $tenant = Tenant::find($tenantId ?? app('current.tenant.id'));
+
+        return $tenant && filled($tenant->qredit_api_key) && filled($tenant->qredit_secret_key);
+    }
 }
 ```
 
-### Refunding a Transaction
+### 2. Pick (or write) a `TenantResolver`
+
+Built-in resolvers cover the common cases:
 
 ```php
-$refund = Qredit::refundTransaction('TXN_123456', [
-    'amount' => 50.00, // Partial refund
-    'reason' => 'Customer request',
-]);
+use Qredit\LaravelQredit\Tenancy\SubdomainTenantResolver;  // "shop-b.example.com" → "shop-b"
+use Qredit\LaravelQredit\Tenancy\HeaderTenantResolver;      // X-Tenant-Id header
+use Qredit\LaravelQredit\Tenancy\CallbackTenantResolver;    // closure escape hatch
+```
 
-if ($refund->isSuccessful()) {
-    // Refund was processed
+### 3. Bind both in a service provider
+
+```php
+use Qredit\LaravelQredit\Contracts\CredentialProvider;
+use Qredit\LaravelQredit\Contracts\TenantResolver;
+use Qredit\LaravelQredit\Tenancy\SubdomainTenantResolver;
+
+public function register(): void
+{
+    $this->app->bind(CredentialProvider::class, \App\Qredit\DbCredentialProvider::class);
+    $this->app->bind(TenantResolver::class, fn () => new SubdomainTenantResolver('example.com'));
 }
 ```
 
-### Webhook Handling
-
-The package automatically registers webhook routes. You can handle webhook events by listening to the provided events:
+### 4. Use the facade — tenancy is transparent
 
 ```php
-// In your EventServiceProvider
-use Qredit\LaravelQredit\Events\PaymentSucceeded;
+// HTTP request — uses the bound TenantResolver automatically.
+Qredit::createOrder([...]);
+
+// Queue job — ALWAYS pass the tenant id explicitly.
+class SettleCartJob implements ShouldQueue
+{
+    public function __construct(public string $tenantId, public string $orderReference) {}
+
+    public function handle(): void
+    {
+        Qredit::forTenant($this->tenantId)->calculateFees([...]);
+    }
+}
+```
+
+See [`docs/MULTITENANCY.md`](docs/MULTITENANCY.md) for deep-dive examples including Bagisto, Stancl Tenancy, and Spatie Multitenancy.
+
+---
+
+## API surface
+
+| Group | Method | Qredit endpoint |
+|---|---|---|
+| Auth | `authenticate()` | `POST /auth/token` |
+| Orders | `createOrder($data)` | `POST /orders` |
+| Orders | `getOrder($ref)` | `GET /orders?orderReference=…` |
+| Orders | `updateOrder($ref, $data)` | `PUT /orders` |
+| Orders | `cancelOrder($ref, $reason)` | `DELETE /orders` |
+| Orders | `listOrders($query)` | `GET /orders` |
+| Payment req. | `createPayment($data)` | `POST /paymentRequests` |
+| Payment req. | `getPayment($ref)` | `GET /paymentRequests?reference=…` |
+| Payment req. | `updatePayment($ref, $data)` | `PUT /paymentRequests` |
+| Payment req. | `deletePayment($ref, $reason)` | `DELETE /paymentRequests` |
+| Payment req. | `listPayments($query)` | `GET /paymentRequests` |
+| Payment req. | `generateQR($query)` | `GET /paymentRequests/generateQR` |
+| Payment req. | `calculateFees($data)` | `POST /paymentRequests/calculateFees` |
+| Payment req. | `initPayment($data)` | `POST /paymentRequests/initPayment` |
+| Customers | `listCustomers($filters)` | `GET /customers` |
+| Transactions | `listTransactions($filters)` | `GET /payments` |
+| Transactions | `changeClearingStatus($data)` | `POST /payments/changeClearingStatus` |
+| Webhook | `verifyWebhookSignature($p, $a)` | — |
+| Webhook | `processWebhook($p, $a)` | — |
+
+Full request/response shapes are in [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md).
+
+---
+
+## Webhook handling
+
+The SDK ships a ready-made webhook controller. Register it with the route macro:
+
+```php
+Route::qreditWebhook('/qredit/webhook');                  // single-tenant
+Route::qreditWebhook('/qredit/webhook/{tenant}');         // multi-tenant (tenant id in URL)
+```
+
+Listen for typed events in your `EventServiceProvider`:
+
+```php
+use Qredit\LaravelQredit\Events\PaymentCompleted;
 use Qredit\LaravelQredit\Events\PaymentFailed;
-use Qredit\LaravelQredit\Events\RefundProcessed;
+use Qredit\LaravelQredit\Events\OrderCancelled;
+use Qredit\LaravelQredit\Events\WebhookReceived;
 
 protected $listen = [
-    PaymentSucceeded::class => [
-        UpdateOrderStatus::class,
-        SendPaymentConfirmation::class,
-    ],
-    PaymentFailed::class => [
-        NotifyCustomerOfFailure::class,
-    ],
-    RefundProcessed::class => [
-        ProcessRefundInSystem::class,
-    ],
+    PaymentCompleted::class => [\App\Listeners\FulfillOrder::class],
+    PaymentFailed::class    => [\App\Listeners\NotifyCustomerOfFailure::class],
+    OrderCancelled::class   => [\App\Listeners\ReleaseStock::class],
 ];
 ```
 
-### Error Handling
+Each event's `$data` payload carries `_tenant_id` so listeners can scope their work correctly in background jobs.
+
+Signature verification uses the per-tenant `secret_key` — no separate webhook secret needed, matching merchant guide §6/§7.
+
+See [`docs/WEBHOOKS.md`](docs/WEBHOOKS.md) for payload shapes and full event documentation.
+
+---
+
+## The checkout widget's `/sign` endpoint
+
+BlockBuilders' hosted checkout widget runs in the customer's browser and needs signed gateway calls — but the secret key must **never** be shipped to the browser. The widget solves this by POSTing `{ body: "..." }` to a merchant-owned `/sign` endpoint and receiving `{ signature: "..." }` back.
+
+The SDK ships that endpoint as `SignController`. Wire it with one line:
 
 ```php
-use Qredit\LaravelQredit\Exceptions\QreditException;
-use Qredit\LaravelQredit\Exceptions\QreditAuthenticationException;
-use Qredit\LaravelQredit\Exceptions\QreditApiException;
-
-try {
-    $response = Qredit::createCheckout([...]);
-} catch (QreditAuthenticationException $e) {
-    // Handle authentication errors
-    Log::error('Authentication failed: ' . $e->getMessage());
-} catch (QreditApiException $e) {
-    // Handle API errors
-    Log::error('API error: ' . $e->getMessage());
-    $errorCode = $e->getCode();
-    $errorResponse = $e->getResponse();
-} catch (QreditException $e) {
-    // Handle general errors
-    Log::error('Qredit error: ' . $e->getMessage());
-}
+Route::qreditSign();   // POST /qredit/sign
 ```
 
-## Advanced Usage
+Pass that URL to `PaymentWidget.init`:
 
-### Using Different Environments
-
-```php
-// Force sandbox mode
-$qredit = new Qredit(sandbox: true);
-
-// Force production mode
-$qredit = new Qredit(sandbox: false);
-
-// Use different API key
-$qredit = new Qredit(apiKey: 'different-api-key');
+```html
+<script>
+  PaymentWidget.init({
+    containerId: 'payment-widget',
+    reference:   '{{ $paymentReference }}',
+    token:       '{{ $accessToken }}',
+    url:         '{{ route("qredit.sign") }}',
+    lang:        app()->getLocale(),
+  });
+</script>
 ```
 
-### Custom Configuration
+The controller pulls the current tenant's secret via your `CredentialProvider`, signs the payload with `HmacSigner`, and returns the hex. The secret never leaves your server.
 
-```php
-// Override configuration at runtime
-config(['qredit.timeout.request' => 120]);
-config(['qredit.retry.max_attempts' => 5]);
-```
+---
 
-### Logging
-
-All API requests and responses are logged when debug mode is enabled:
-
-```php
-// Enable debug logging
-config(['qredit.debug' => true]);
-
-// Use custom log channel
-config(['qredit.logging.channel' => 'payments']);
-```
-
-## Testing
-
-```bash
-# Run tests
-composer test
-
-# Run tests with coverage
-composer test-coverage
-
-# Run static analysis
-composer analyse
-
-# Format code
-composer format
-```
-
-### Mocking in Tests
+## Testing with `FakeQredit`
 
 ```php
 use Qredit\LaravelQredit\Facades\Qredit;
-use Qredit\LaravelQredit\DataTransferObjects\CheckoutResponse;
+use Qredit\LaravelQredit\Testing\FakeQredit;
 
-// In your test
-Qredit::fake();
+it('creates an order when checkout starts', function () {
+    $fake = new FakeQredit([
+        'createOrder' => [
+            'status'  => true,
+            'code'    => '00',
+            'records' => [['orderReference' => 'ORDER-1']],
+        ],
+    ]);
 
-// Define expected responses
-Qredit::shouldReceive('createCheckout')
-    ->once()
-    ->andReturn(new CheckoutResponse([
-        'id' => 'CHK_123',
-        'status' => 'pending',
-        'checkout_url' => 'https://checkout.qredit.com/session/123',
-    ]));
+    Qredit::fake($fake);
 
-// Your test code here
+    $this->post('/checkout/place-order', [/* ... */])->assertOk();
+
+    $fake->assertCalled('createOrder');
+    $fake->assertCalledWith('createOrder', fn ($args) => $args[0]['amountCents'] === 3200);
+});
 ```
 
-## API Reference
+Full testing guide: [`docs/TESTING.md`](docs/TESTING.md).
 
-### Available Methods
+---
 
-- `authenticate(bool $force = false): string` - Get authentication token
-- `createCheckout(array $data): CheckoutResponse` - Create checkout session
-- `getTransaction(string $id): TransactionResponse` - Get transaction details
-- `listTransactions(array $filters = []): Collection` - List transactions
-- `refundTransaction(string $id, array $data): RefundResponse` - Process refund
-- `cancelTransaction(string $id): TransactionResponse` - Cancel transaction
-- `getBalance(): BalanceResponse` - Get account balance
-- `validateWebhookSignature(Request $request): bool` - Validate webhook
+## CLI — `qredit:call`
 
-## Changelog
+Because every request needs an HMAC signature, Postman / Insomnia aren't practical. The SDK ships a signed-request CLI:
 
-Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
+```bash
+# Every supported endpoint
+php artisan qredit:call --list
 
-## Contributing
+# Live auth call
+php artisan qredit:call auth \
+  --api-key=... --secret-key=... --sandbox
 
-Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
+# Create order from an inline payload
+php artisan qredit:call create-order \
+  --payload='{"amountCents":3200,"currencyCode":"ILS",...}'
 
-## Security
+# From a JSON file
+php artisan qredit:call create-payment \
+  --payload-file=./tests/fixtures/payment.json
 
-If you discover any security-related issues, please email security@qredit.com instead of using the issue tracker.
+# Dry-run — prints signature + payload without sending
+php artisan qredit:call create-order --dry-run \
+  --secret-key=... --payload='{...}'
 
-## Credits
+# Flip signature hex case (gateway is strict)
+php artisan qredit:call auth --case=upper ...
+```
 
-- [PaltechHub](https://github.com/PaltechHub)
-- [All Contributors](../../contributors)
+---
+
+## Configuration reference
+
+Full [`config/qredit.php`](config/qredit.php) options:
+
+| Key | Env | Default | Purpose |
+|---|---|---|---|
+| `api_key` | `QREDIT_API_KEY` | `''` | Public API key (single-tenant default) |
+| `secret_key` | `QREDIT_SECRET_KEY` | `''` | HMAC secret (single-tenant default) |
+| `sandbox` | `QREDIT_SANDBOX` | `true` | UAT vs production |
+| `sandbox_url` | `QREDIT_SANDBOX_URL` | `https://apitest.qredit.tech/gw-checkout/api/v1` | |
+| `production_url` | `QREDIT_PRODUCTION_URL` | `https://api.qredit.tech/gw-checkout/api/v1` | |
+| `language` | `QREDIT_LANGUAGE` | `EN` | `Accept-Language` header |
+| `client.type` | `QREDIT_CLIENT_TYPE` | `MP` | `Client-Type` header |
+| `client.version` | `QREDIT_CLIENT_VERSION` | `1.0.0` | `Client-Version` header |
+| `signing.scheme` | `QREDIT_AUTH_SCHEME` | `HmacSHA512_O` | Authorization prefix |
+| `signing.case` | `QREDIT_SIGNATURE_CASE` | `lower` | Hex case (`lower` \| `upper`) |
+| `token_storage.strategy` | `QREDIT_TOKEN_STRATEGY` | `cache` | `cache`, `database`, or `hybrid` |
+| `debug` | `QREDIT_DEBUG` | `false` | Log every request + response |
+
+---
+
+## Troubleshooting
+
+### `code 1004 "Bad Signature"`
+
+The gateway accepts your header format but rejects the hash. Most common causes:
+
+1. **Credentials not provisioned** — the apiKey isn't in the gateway's user database. Verify with a second host: if one host returns `1004` and another returns `1705 "User Not Found"`, the account isn't set up. Ask your Qredit contact to provision the key.
+2. **Signature case** — try flipping `QREDIT_SIGNATURE_CASE=upper`. The merchant doc itself contradicts on case (§7 step 4 says upper, step 5 says lower).
+3. **Wrong host** — `apitest.qredit.tech` (public UAT) and `185.57.122.58:2030` (VPN UAT) may have different user tables.
+
+See [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) for the full diagnostic playbook.
+
+### `code 1005 "Bad Signature"`
+
+The Authorization header is missing or the scheme prefix is wrong. Check that you send `HmacSHA512_O <hex>` (not `HMAC-SHA512` or `Bearer`).
+
+### `QreditException: Qredit credentials missing`
+
+The default `ConfigCredentialProvider` couldn't find `QREDIT_API_KEY` / `QREDIT_SECRET_KEY` in config. Either set them in `.env`, or bind a custom `CredentialProvider` for multi-tenant use.
+
+---
+
+## Documentation
+
+| Doc | Topic |
+|---|---|
+| [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) | Every wrapped endpoint — full request / response shapes |
+| [`docs/MULTITENANCY.md`](docs/MULTITENANCY.md) | Deep-dive with Bagisto / Stancl / Spatie examples |
+| [`docs/SIGNING.md`](docs/SIGNING.md) | HMAC SHA512 algorithm — step-by-step with the §7 worked example |
+| [`docs/WEBHOOKS.md`](docs/WEBHOOKS.md) | Event payloads + listener patterns |
+| [`docs/TESTING.md`](docs/TESTING.md) | `FakeQredit`, Saloon mock clients, feature tests |
+| [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | Every error code, every diagnostic step |
+| [`docs/LLM_IMPLEMENTATION_GUIDE.md`](docs/LLM_IMPLEMENTATION_GUIDE.md) | Structured reference for AI agents |
+| [`docs/QREDIT_SIGNATURE_ISSUE.md`](docs/QREDIT_SIGNATURE_ISSUE.md) | Current known issue with UAT credentials |
+| [`examples/BasicUsage.php`](examples/BasicUsage.php) | Copy-paste recipes for every endpoint |
+| [`examples/MultiTenantUsage.php`](examples/MultiTenantUsage.php) | Full multi-tenant integration |
+| [`examples/WebhookHandler.php`](examples/WebhookHandler.php) | Signed-callback handler |
+
+---
 
 ## License
 
-The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
-
-## Support
-
-For support, please contact support@qredit.com or visit our [documentation](https://docs.qredit.com).
+MIT — see [LICENSE.md](LICENSE.md).

@@ -14,6 +14,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Secret API Key
+    |--------------------------------------------------------------------------
+    |
+    | Server-side secret used to compute the HMAC SHA512 signature that goes
+    | into the Authorization header of every request (merchant guide §7).
+    | Never expose this to browsers or client-side code.
+    |
+    */
+    'secret_key' => env('QREDIT_SECRET_KEY', ''),
+
+    /*
+    |--------------------------------------------------------------------------
     | Sandbox Mode
     |--------------------------------------------------------------------------
     |
@@ -28,22 +40,20 @@ return [
     | Sandbox URL
     |--------------------------------------------------------------------------
     |
-    | The sandbox/testing API URL for Qredit. This will be used when sandbox
-    | mode is enabled.
+    | UAT base URL per merchant guide + Jira story.
     |
     */
-    'sandbox_url' => env('QREDIT_SANDBOX_URL', 'http://185.57.122.58:2030/gw-checkout/api/v1'),
+    'sandbox_url' => env('QREDIT_SANDBOX_URL', 'https://apitest.qredit.tech/gw-checkout/api/v1'),
 
     /*
     |--------------------------------------------------------------------------
     | Production URL
     |--------------------------------------------------------------------------
     |
-    | The production API URL for Qredit. This will be used when sandbox
-    | mode is disabled.
+    | Production base URL per merchant guide + Jira story.
     |
     */
-    'production_url' => env('QREDIT_PRODUCTION_URL', 'https://api.qredit.com/gw-checkout/api/v1'),
+    'production_url' => env('QREDIT_PRODUCTION_URL', 'https://api.qredit.tech/gw-checkout/api/v1'),
 
     /*
     |--------------------------------------------------------------------------
@@ -67,18 +77,23 @@ return [
     'client' => [
         'type' => env('QREDIT_CLIENT_TYPE', 'MP'),
         'version' => env('QREDIT_CLIENT_VERSION', '1.0.0'),
-        'authorization' => env('QREDIT_CLIENT_AUTHORIZATION', 'HmacSHA512_O'),
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | SDK Mode Configuration
+    | Signing Configuration
     |--------------------------------------------------------------------------
     |
-    | When sdk_enabled is false, adds Authorization header to all requests
+    | Controls the Authorization header format and HMAC SHA512 output case.
+    | The Angular reference implementation the gateway ships uppercases the
+    | output (see docs/SIGNING.md). Default to 'upper'; flip to 'lower' via
+    | QREDIT_SIGNATURE_CASE=lower only if a specific deployment demands it.
     |
     */
-    'sdk_enabled' => env('QREDIT_SDK_ENABLED', true),
+    'signing' => [
+        'scheme' => env('QREDIT_AUTH_SCHEME', 'HmacSHA512_O'),
+        'case' => env('QREDIT_SIGNATURE_CASE', 'upper'), // 'upper' (default) | 'lower'
+    ],
 
     /*
     |--------------------------------------------------------------------------

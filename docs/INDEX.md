@@ -1,187 +1,51 @@
-# Qredit Laravel SDK Documentation
+# Documentation index
 
-Welcome to the comprehensive documentation for the Qredit Laravel SDK v0.1.1.
+## Getting started
+- [README](../README.md) — install + quick start
+- [examples/BasicUsage.php](../examples/BasicUsage.php) — copy-paste recipes for every endpoint
+- [examples/MultiTenantUsage.php](../examples/MultiTenantUsage.php) — full SAAS wiring
+- [examples/WebhookHandler.php](../examples/WebhookHandler.php) — signed-callback handler
 
-## Documentation Structure
+## Core guides
+- [API_REFERENCE.md](API_REFERENCE.md) — every wrapped endpoint, request + response shapes
+- [MULTITENANCY.md](MULTITENANCY.md) — the two contracts, integration recipes for Bagisto / Stancl / Spatie
+- [SIGNING.md](SIGNING.md) — HMAC SHA512 algorithm, merchant guide §7 walkthrough, debugging
+- [WEBHOOKS.md](WEBHOOKS.md) — event payloads, listener patterns, signature verification
+- [TESTING.md](TESTING.md) — `FakeQredit`, Saloon `MockClient`, Pest examples
 
-### For Developers
+## Operations
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — every error code, every diagnostic step
+- [QREDIT_SIGNATURE_ISSUE.md](QREDIT_SIGNATURE_ISSUE.md) — current known issue with UAT credentials (live until Qredit provisions)
 
-#### 1. [API Reference](API_REFERENCE.md)
-Complete API documentation with examples for every method, error handling, webhooks, and advanced usage patterns.
+## For tool builders
+- [LLM_IMPLEMENTATION_GUIDE.md](LLM_IMPLEMENTATION_GUIDE.md) — structured reference for AI agents working on consumers
 
-**What's inside:**
-- Full method signatures and parameters
-- Real-world code examples
-- Response formats
-- Error handling patterns
-- Testing strategies
-- Advanced usage scenarios
+## Decision matrix
 
-#### 2. [README](../README.md)
-Quick start guide and basic usage examples.
+| Question | Read this |
+|---|---|
+| "I need to install the SDK" | [README](../README.md) |
+| "I need to call Qredit from a single Laravel app" | [README — Quick start](../README.md#quick-start--single-tenant) |
+| "My app is multi-tenant (SAAS, Bagisto, subdomain per customer)" | [MULTITENANCY.md](MULTITENANCY.md) |
+| "I'm adding a new endpoint wrapper" | [LLM_IMPLEMENTATION_GUIDE.md — add an endpoint](LLM_IMPLEMENTATION_GUIDE.md) |
+| "I want to understand the signature algorithm" | [SIGNING.md](SIGNING.md) |
+| "I'm writing a feature test" | [TESTING.md](TESTING.md) |
+| "I'm getting `code 1004 Bad Signature`" | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) |
+| "How do I handle a webhook?" | [WEBHOOKS.md](WEBHOOKS.md) |
+| "How do I embed the checkout widget?" | [README — widget section](../README.md#the-checkout-widgets-sign-endpoint) |
 
-**What's inside:**
-- Installation instructions
-- Basic configuration
-- Simple usage examples
-- Requirements and compatibility
+## Project status
 
-#### 3. [CHANGELOG](../CHANGELOG.md)
-Version history and release notes.
+| Surface | State |
+|---|---|
+| SDK algorithm (signing, token cache, retry) | ✅ Complete, unit-tested |
+| All 18 endpoint wrappers | ✅ Complete |
+| Multi-tenant contracts (`CredentialProvider`, `TenantResolver`) | ✅ Complete |
+| Ready-made `/sign` + `/webhook` controllers | ✅ Complete |
+| Route macros | ✅ Complete |
+| `FakeQredit` test double | ✅ Complete |
+| `qredit:call` CLI (Postman replacement) | ✅ Complete, full endpoint coverage |
+| `qredit:install` onboarding | ✅ Complete |
+| Live UAT auth verification | ⚠️ Blocked on Qredit provisioning Jira credentials — see [QREDIT_SIGNATURE_ISSUE.md](QREDIT_SIGNATURE_ISSUE.md) |
 
-**What's inside:**
-- New features per version
-- Bug fixes
-- Breaking changes
-- Migration guides
-
-### For AI/LLM Assistants
-
-#### [LLM Implementation Guide](LLM_IMPLEMENTATION_GUIDE.md)
-Structured guide for AI assistants to understand and work with the SDK.
-
-**What's inside:**
-- Architecture overview
-- Implementation patterns
-- Code templates
-- Best practices
-- Common tasks and solutions
-
-### Technical Deep Dives
-
-#### 1. [Message ID Uniqueness](MESSAGE_ID_UNIQUENESS.md)
-Technical analysis of the message ID generation system.
-
-**What's inside:**
-- Uniqueness algorithm
-- Collision probability analysis
-- Performance metrics
-- Implementation details
-
-#### 2. [Release Notes v0.1.1](../RELEASE_NOTES_v0.1.1.md)
-Detailed notes for the latest release.
-
-**What's inside:**
-- New features in v0.1.1
-- Bug fixes
-- Migration guide
-- Testing results
-
-#### 3. [Test Results v0.1.1](../TEST_RESULTS_v0.1.1.md)
-Complete test coverage report for v0.1.1.
-
-**What's inside:**
-- Test coverage metrics
-- Feature test results
-- Known issues
-- Running tests
-
-## Quick Navigation
-
-### By Use Case
-
-#### "I want to integrate Qredit payments into my Laravel app"
-→ Start with [API Reference](API_REFERENCE.md)
-
-#### "I need to understand the codebase structure"
-→ Read [LLM Implementation Guide](LLM_IMPLEMENTATION_GUIDE.md)
-
-#### "I want to see what's new"
-→ Check [CHANGELOG](../CHANGELOG.md)
-
-#### "I'm an AI assistant helping with this SDK"
-→ Use [LLM Implementation Guide](LLM_IMPLEMENTATION_GUIDE.md)
-
-#### "I need to debug an issue"
-→ See Error Handling in [API Reference](API_REFERENCE.md#error-handling)
-
-### By Feature
-
-| Feature | Documentation |
-|---------|--------------|
-| Payment Processing | [Payment Requests](API_REFERENCE.md#payment-requests) |
-| Order Management | [Orders](API_REFERENCE.md#orders) |
-| Customer Management | [Customers](API_REFERENCE.md#customers) |
-| Transaction History | [Transactions](API_REFERENCE.md#transactions) |
-| Webhook Handling | [Webhooks](API_REFERENCE.md#webhooks) |
-| Error Handling | [Error Handling](API_REFERENCE.md#error-handling) |
-| Testing | [Testing](API_REFERENCE.md#testing) |
-| Configuration | [Configuration](API_REFERENCE.md#configuration) |
-
-## Getting Started
-
-### For New Users
-
-1. **Install the package**
-   ```bash
-   composer require qredit/laravel-qredit
-   ```
-
-2. **Configure your environment**
-   - Copy environment variables from [Configuration](API_REFERENCE.md#configuration)
-   - Add your API key to `.env`
-
-3. **Basic Usage**
-   ```php
-   use Qredit\LaravelQredit\Facades\Qredit;
-
-   $payment = Qredit::createPayment([
-       'amount' => 100.00,
-       'currencyCode' => 'ILS',
-       'description' => 'Test payment',
-       // ... see API Reference for full options
-   ]);
-   ```
-
-4. **Learn More**
-   - [Full API Reference](API_REFERENCE.md)
-   - [Code Examples](API_REFERENCE.md#payment-requests)
-   - [Error Handling](API_REFERENCE.md#error-handling)
-
-### For Existing Users Upgrading to v0.1.1
-
-1. **Review Breaking Changes**
-   - Check [CHANGELOG](../CHANGELOG.md) for any breaking changes
-   - No breaking changes in v0.1.1
-
-2. **New Features**
-   - [List Customers](API_REFERENCE.md#list-customers)
-   - [List Transactions](API_REFERENCE.md#list-transactions)
-   - Configurable sandbox URL
-
-3. **Bug Fixes**
-   - Saloon v3 compatibility
-   - Property conflicts resolved
-   - See [Release Notes](../RELEASE_NOTES_v0.1.1.md)
-
-## Support
-
-### Resources
-
-- **GitHub Repository**: [github.com/PaltechHub/qredit-laravel](https://github.com/PaltechHub/qredit-laravel)
-- **Issues**: [github.com/PaltechHub/qredit-laravel/issues](https://github.com/PaltechHub/qredit-laravel/issues)
-- **Email Support**: support@qredit.com
-- **API Status**: [status.qredit.com](https://status.qredit.com)
-
-### Common Issues
-
-| Issue | Solution | Documentation |
-|-------|----------|---------------|
-| Authentication fails | Check API key in `.env` | [Configuration](API_REFERENCE.md#configuration) |
-| Webhook signature invalid | Verify webhook secret | [Webhooks](API_REFERENCE.md#webhooks) |
-| Rate limiting | Implement retry logic | [Rate Limiting](API_REFERENCE.md#rate-limiting) |
-| Mockery conflicts in tests | Use `skipAuth` parameter | [Testing](API_REFERENCE.md#testing) |
-
-## Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](../CONTRIBUTING.md) for details.
-
-## License
-
-The Qredit Laravel SDK is open-source software licensed under the [MIT license](../LICENSE.md).
-
----
-
-**Documentation Version**: 1.0.0
-**SDK Version**: 0.1.1
-**Last Updated**: December 31, 2024
+The SDK is production-ready from a code perspective. The remaining blocker is credential provisioning on the Qredit side — once resolved, no code changes needed.

@@ -5,81 +5,115 @@ declare(strict_types=1);
 namespace Qredit\LaravelQredit;
 
 use Illuminate\Support\Facades\Cache;
-use Saloon\Http\Response;
 use Qredit\LaravelQredit\Connectors\QreditConnector;
-use Qredit\LaravelQredit\Requests\Auth\GetTokenRequest;
-use Qredit\LaravelQredit\Requests\PaymentRequests\CreatePaymentRequest;
-use Qredit\LaravelQredit\Requests\PaymentRequests\GetPaymentRequest;
-use Qredit\LaravelQredit\Requests\PaymentRequests\UpdatePaymentRequest;
-use Qredit\LaravelQredit\Requests\PaymentRequests\CancelPaymentRequest;
-use Qredit\LaravelQredit\Requests\PaymentRequests\ListPaymentRequestsRequest;
-use Qredit\LaravelQredit\Requests\Orders\CreateOrderRequest;
-use Qredit\LaravelQredit\Requests\Orders\GetOrderRequest;
-use Qredit\LaravelQredit\Requests\Orders\UpdateOrderRequest;
-use Qredit\LaravelQredit\Requests\Orders\CancelOrderRequest;
-use Qredit\LaravelQredit\Requests\Orders\ListOrdersRequest;
-use Qredit\LaravelQredit\Requests\Customers\ListCustomersRequest;
-use Qredit\LaravelQredit\Requests\Transactions\ListTransactionsRequest;
 use Qredit\LaravelQredit\Exceptions\QreditAuthenticationException;
 use Qredit\LaravelQredit\Exceptions\QreditException;
+use Qredit\LaravelQredit\Requests\Auth\GetTokenRequest;
+use Qredit\LaravelQredit\Requests\Customers\ListCustomersRequest;
+use Qredit\LaravelQredit\Requests\Orders\CancelOrderRequest;
+use Qredit\LaravelQredit\Requests\Orders\CreateOrderRequest;
+use Qredit\LaravelQredit\Requests\Orders\GetOrderRequest;
+use Qredit\LaravelQredit\Requests\Orders\ListOrdersRequest;
+use Qredit\LaravelQredit\Requests\Orders\UpdateOrderRequest;
+use Qredit\LaravelQredit\Requests\Payments\ChangeClearingStatusRequest;
+use Qredit\LaravelQredit\Requests\PaymentRequests\CalculateFeesRequest;
+use Qredit\LaravelQredit\Requests\PaymentRequests\CancelPaymentRequest;
+use Qredit\LaravelQredit\Requests\PaymentRequests\CreatePaymentRequest;
+use Qredit\LaravelQredit\Requests\PaymentRequests\GenerateQRRequest;
+use Qredit\LaravelQredit\Requests\PaymentRequests\GetPaymentRequest;
+use Qredit\LaravelQredit\Requests\PaymentRequests\InitPaymentRequest;
+use Qredit\LaravelQredit\Requests\PaymentRequests\ListPaymentRequestsRequest;
+use Qredit\LaravelQredit\Requests\PaymentRequests\UpdatePaymentRequest;
+use Qredit\LaravelQredit\Requests\Transactions\ListTransactionsRequest;
+use Qredit\LaravelQredit\Security\HmacSigner;
+use Saloon\Http\Response;
 
 class Qredit
 {
-    /**
-     * The Qredit connector instance.
-     */
     protected QreditConnector $connector;
 
-    /**
-     * The cache key for storing the authentication token.
-     */
-    protected string $cacheKey = 'qredit_auth_token';
+    protected string $apiKey;
 
     /**
-     * Create a new Qredit instance.
+     * Build a Qredit client from a credential array. Call this per-tenant; each
+     * instance owns its own connector + token cache key.
+     *
+     * Accepted options:
+     *  - api_key      (required)
+     *  - secret_key   (required for signing)
+     *  - sandbox      (bool, default true)
+     *  - language     ('EN' | 'AR')
+     *  - auth_scheme  (default 'HmacSHA512_O')
+     *  - signature_case ('lower' | 'upper')
+     *  - sandbox_url / production_url (override URLs per-tenant if needed)
+     *  - skip_auth    (bool, default false — skip the initial /auth/token call)
      */
-    public function __construct(?string $apiKey = null, ?bool $sandbox = null, bool $skipAuth = false)
+    public static function make(array $options): self
     {
-        $apiKey = $apiKey ?? config('qredit.api_key');
-        $sandbox = $sandbox ?? config('qredit.sandbox', false);
+        $skipAuth = (bool) ($options['skip_auth'] ?? false);
+        unset($options['skip_auth']);
 
-        if (!$apiKey) {
+        return new self($options, null, $skipAuth);
+    }
+
+    /**
+     * @param  array<string, mixed>|string|null  $options  Either an options array (preferred),
+     *                                                    or an api-key string for backward compatibility.
+     */
+    public function __construct(array|string|null $options = null, ?bool $sandbox = null, bool $skipAuth = false)
+    {
+        // Backward-compat: positional ($apiKey, $sandbox, $skipAuth)
+        if (is_string($options) || $options === null) {
+            $options = [
+                'api_key' => $options ?? config('qredit.api_key'),
+                'secret_key' => config('qredit.secret_key', ''),
+                'sandbox' => $sandbox ?? config('qredit.sandbox', true),
+            ];
+        }
+
+        $apiKey = $options['api_key'] ?? config('qredit.api_key');
+
+        if (empty($apiKey)) {
             throw new QreditException('Qredit API key is not configured');
         }
 
-        $this->connector = new QreditConnector($apiKey, $sandbox);
+        $this->apiKey = $apiKey;
+        $options['api_key'] = $apiKey;
+        $options['secret_key'] = $options['secret_key'] ?? config('qredit.secret_key', '');
 
-        // Attempt to authenticate and set token (skip in test environment if requested)
-        if (!$skipAuth) {
+        $this->connector = new QreditConnector($options);
+
+        if (! $skipAuth) {
             $this->authenticate();
         }
     }
 
-    /**
-     * Get the connector instance.
-     */
     public function getConnector(): QreditConnector
     {
         return $this->connector;
     }
 
     /**
-     * Authenticate with the Qredit API.
+     * Cache key namespaced by api key so multiple tenants share a single cache store.
      */
+    protected function cacheKey(): string
+    {
+        return 'qredit_auth_token:'.sha1($this->apiKey);
+    }
+
     public function authenticate(bool $force = false): string
     {
-        // Check if we have a cached token and it's not a forced refresh
-        if (!$force && $token = $this->getCachedToken()) {
+        if (! $force && $token = $this->getCachedToken()) {
             $this->connector->setAuthToken($token);
+
             return $token;
         }
 
-        // Request a new token
         $response = $this->connector->send(
-            new GetTokenRequest($this->connector->getApiKey())
+            new GetTokenRequest($this->apiKey)
         );
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             throw new QreditAuthenticationException(
                 'Failed to authenticate with Qredit API',
                 $response->status()
@@ -87,72 +121,72 @@ class Qredit
         }
 
         $data = $response->json();
-        $token = $data['token'] ?? $data['access_token'] ?? null;
+        $token = $data['access_token'] ?? $data['token'] ?? null;
 
-        if (!$token) {
+        if (! $token) {
             throw new QreditAuthenticationException('No token received from Qredit API');
         }
 
-        // Cache the token
-        $this->cacheToken($token, $data['expires_in'] ?? 3600);
-
-        // Set the token on the connector
+        $this->cacheToken($token, (int) ($data['expires_in'] ?? 3600));
         $this->connector->setAuthToken($token);
 
         return $token;
     }
 
-    /**
-     * Get the cached authentication token.
-     */
-    protected function getCachedToken(): ?string
+    public function getCachedToken(): ?string
     {
-        if (!config('qredit.cache_token', true)) {
+        if (! config('qredit.cache_token', true)) {
             return null;
         }
 
-        return Cache::get($this->cacheKey);
+        try {
+            return Cache::get($this->cacheKey());
+        } catch (\Throwable) {
+            // Cache store misconfigured (e.g. no DB table in a CLI-only tool).
+            // Fall through and re-authenticate on every call.
+            return null;
+        }
     }
 
-    /**
-     * Cache the authentication token.
-     */
-    protected function cacheToken(string $token, int $ttl = 3600): void
+    public function cacheToken(string $token, int $ttl = 3600): void
     {
-        if (!config('qredit.cache_token', true)) {
+        if (! config('qredit.cache_token', true)) {
             return;
         }
 
-        // Cache for slightly less than the actual TTL to avoid edge cases
-        Cache::put($this->cacheKey, $token, $ttl - 60);
+        try {
+            Cache::put($this->cacheKey(), $token, max($ttl - 60, 60));
+        } catch (\Throwable) {
+            // Ignore cache write failures — token still lives on the connector.
+        }
     }
 
-    /**
-     * Clear the cached authentication token.
-     */
     public function clearCachedToken(): void
     {
-        Cache::forget($this->cacheKey);
+        try {
+            Cache::forget($this->cacheKey());
+        } catch (\Throwable) {
+            // ignore
+        }
+        $this->connector->clearAuthToken();
     }
 
-    /**
-     * Ensure the client is authenticated.
-     */
     protected function ensureAuthenticated(): void
     {
-        if (!$this->connector->getAuthToken()) {
+        if (! $this->connector->getAuthToken()) {
             $this->authenticate();
         }
     }
 
     /**
-     * Send a request with automatic token refresh on 401 errors.
+     * Send a request, refreshing the token once on 401.
      */
     protected function sendWithRetry($request): Response
     {
+        $this->ensureAuthenticated();
+
         $response = $this->connector->send($request);
 
-        // If we get a 401, try to re-authenticate and retry once
         if ($response->status() === 401) {
             $this->authenticate(true);
             $response = $this->connector->send($request);
@@ -161,187 +195,154 @@ class Qredit
         return $response;
     }
 
-    /**
-     * Create a new payment request.
-     */
+    // ----- Payment Requests --------------------------------------------------
+
     public function createPayment(array $data): array
     {
-        $response = $this->sendWithRetry(new CreatePaymentRequest($data));
-        return $response->json();
+        return $this->sendWithRetry(new CreatePaymentRequest($data))->json();
     }
 
-    /**
-     * Get a payment request by ID.
-     */
     public function getPayment(string $paymentRequestId): array
     {
-        $response = $this->sendWithRetry(new GetPaymentRequest($paymentRequestId));
-        return $response->json();
+        return $this->sendWithRetry(new GetPaymentRequest($paymentRequestId))->json();
     }
 
-    /**
-     * Update a payment request.
-     */
     public function updatePayment(string $paymentRequestId, array $data): array
     {
-        $response = $this->sendWithRetry(new UpdatePaymentRequest($paymentRequestId, $data));
-        return $response->json();
+        return $this->sendWithRetry(new UpdatePaymentRequest($paymentRequestId, $data))->json();
     }
 
-    /**
-     * Delete a payment request.
-     */
-    public function deletePayment(string $paymentRequestId): bool
+    public function deletePayment(string $paymentRequestId, ?string $reason = null): array
     {
-        $response = $this->sendWithRetry(new CancelPaymentRequest($paymentRequestId));
-        return $response->successful();
+        return $this->sendWithRetry(new CancelPaymentRequest($paymentRequestId, $reason))->json();
     }
 
-    /**
-     * List payment requests.
-     */
     public function listPayments(array $query = []): array
     {
-        $response = $this->sendWithRetry(new ListPaymentRequestsRequest($query));
-        return $response->json();
+        return $this->sendWithRetry(new ListPaymentRequestsRequest($query))->json();
     }
 
-    /**
-     * Create a new order.
-     */
+    public function generateQR(array $query): array
+    {
+        return $this->sendWithRetry(new GenerateQRRequest($query))->json();
+    }
+
+    public function calculateFees(array $data): array
+    {
+        return $this->sendWithRetry(new CalculateFeesRequest($data))->json();
+    }
+
+    public function initPayment(array $data): array
+    {
+        return $this->sendWithRetry(new InitPaymentRequest($data))->json();
+    }
+
+    // ----- Orders ------------------------------------------------------------
+
     public function createOrder(array $data): array
     {
-        $response = $this->sendWithRetry(new CreateOrderRequest($data));
-        return $response->json();
+        return $this->sendWithRetry(new CreateOrderRequest($data))->json();
     }
 
-    /**
-     * Register a new order (alias for createOrder for clarity).
-     */
     public function registerOrder(array $data): array
     {
         return $this->createOrder($data);
     }
 
-    /**
-     * Get an order by ID.
-     */
     public function getOrder(string $orderId): array
     {
-        $response = $this->sendWithRetry(new GetOrderRequest($orderId));
-        return $response->json();
+        return $this->sendWithRetry(new GetOrderRequest($orderId))->json();
     }
 
-    /**
-     * Update an order.
-     */
     public function updateOrder(string $orderId, array $data): array
     {
-        $response = $this->sendWithRetry(new UpdateOrderRequest($orderId, $data));
-        return $response->json();
+        return $this->sendWithRetry(new UpdateOrderRequest($orderId, $data))->json();
     }
 
-    /**
-     * Cancel an order.
-     */
     public function cancelOrder(string $orderId, ?string $reason = null): array
     {
-        $response = $this->sendWithRetry(new CancelOrderRequest($orderId, $reason));
-        return $response->json();
+        return $this->sendWithRetry(new CancelOrderRequest($orderId, $reason))->json();
     }
 
-    /**
-     * List orders.
-     */
     public function listOrders(array $query = []): array
     {
-        $response = $this->sendWithRetry(new ListOrdersRequest($query));
-        return $response->json();
+        return $this->sendWithRetry(new ListOrdersRequest($query))->json();
     }
 
-    /**
-     * List customers.
-     */
+    // ----- Customers & Transactions -----------------------------------------
+
     public function listCustomers(array $filters = []): array
     {
-        $this->ensureAuthenticated();
-
-        $response = $this->sendWithRetry(new ListCustomersRequest($filters));
-        return $response->json();
+        return $this->sendWithRetry(new ListCustomersRequest($filters))->json();
     }
 
-    /**
-     * List transactions (payments).
-     */
     public function listTransactions(array $filters = []): array
     {
-        $this->ensureAuthenticated();
-
-        $response = $this->sendWithRetry(new ListTransactionsRequest($filters));
-        return $response->json();
+        return $this->sendWithRetry(new ListTransactionsRequest($filters))->json();
     }
 
-    /**
-     * Verify webhook signature.
-     */
-    public function verifyWebhookSignature(string $payload, string $signature): bool
+    public function changeClearingStatus(array $data): array
     {
-        if (!config('qredit.webhook_secret')) {
-            throw new QreditException('Webhook secret is not configured');
+        return $this->sendWithRetry(new ChangeClearingStatusRequest($data))->json();
+    }
+
+    // ----- Webhook / callback signing ---------------------------------------
+
+    /**
+     * Verify the signature on an inbound webhook payload. Per merchant doc the same
+     * HMAC SHA512 scheme that signs outgoing requests also validates callbacks; the
+     * gateway uses this connector's secretKey + the payload's own msgId.
+     */
+    public function verifyWebhookSignature(array $payload, string $authorizationHeader): bool
+    {
+        $scheme = $this->connector->getAuthScheme();
+        $expectedPrefix = $scheme.' ';
+
+        if (! str_starts_with($authorizationHeader, $expectedPrefix)) {
+            return false;
         }
 
-        $expectedSignature = hash_hmac(
-            'sha512',
-            $payload,
-            config('qredit.webhook_secret')
-        );
+        $providedSignature = substr($authorizationHeader, strlen($expectedPrefix));
 
-        return hash_equals($expectedSignature, $signature);
+        $msgId = $payload['msgId'] ?? null;
+        if (! is_string($msgId) || $msgId === '') {
+            return false;
+        }
+
+        $values = \Qredit\LaravelQredit\Security\ValueFlattener::flatten($payload);
+
+        $expectedLower = HmacSigner::sign($this->connector->getSecretKey(), $msgId, $values, HmacSigner::CASE_LOWER);
+        $expectedUpper = strtoupper($expectedLower);
+
+        return hash_equals($expectedLower, $providedSignature)
+            || hash_equals($expectedUpper, $providedSignature);
     }
 
     /**
-     * Process a webhook payload.
+     * Process a webhook payload — verify (if signature provided) and return a
+     * normalized envelope for the caller to dispatch.
      */
-    public function processWebhook(array $payload, ?string $signature = null): array
+    public function processWebhook(array $payload, ?string $authorizationHeader = null): array
     {
-        // Verify signature if provided
-        if ($signature && config('qredit.verify_webhook_signature', true)) {
-            $valid = $this->verifyWebhookSignature(
-                json_encode($payload),
-                $signature
-            );
-
-            if (!$valid) {
+        if ($authorizationHeader !== null && config('qredit.verify_webhook_signature', true)) {
+            if (! $this->verifyWebhookSignature($payload, $authorizationHeader)) {
                 throw new QreditException('Invalid webhook signature');
             }
         }
 
-        // Process the webhook based on event type
-        $eventType = $payload['event'] ?? $payload['type'] ?? null;
-
-        if (!$eventType) {
-            throw new QreditException('Webhook event type not found');
-        }
-
-        // Return processed data
         return [
-            'event' => $eventType,
-            'data' => $payload['data'] ?? $payload,
+            'event' => $payload['event'] ?? $payload['type'] ?? 'transaction',
+            'data' => $payload['records'][0] ?? $payload['data'] ?? $payload,
+            'raw' => $payload,
             'processed_at' => now()->toIso8601String(),
         ];
     }
 
-    /**
-     * Check if in sandbox mode.
-     */
     public function isSandbox(): bool
     {
         return $this->connector->isSandbox();
     }
 
-    /**
-     * Get the API base URL.
-     */
     public function getApiUrl(): string
     {
         return $this->connector->resolveBaseUrl();

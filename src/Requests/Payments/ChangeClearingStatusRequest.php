@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Qredit\LaravelQredit\Requests\Orders;
+namespace Qredit\LaravelQredit\Requests\Payments;
 
 use Qredit\LaravelQredit\Requests\BaseQreditRequest;
 use Qredit\LaravelQredit\Traits\HasMessageId;
@@ -11,9 +11,11 @@ use Saloon\Enums\Method;
 use Saloon\Traits\Body\HasJsonBody;
 
 /**
- * POST /orders — merchant doc §3.
+ * POST /payments/changeClearingStatus — swagger.
+ *
+ * Body: { msgId, encodedId, clearingStatus, statusReason, username? }.
  */
-class CreateOrderRequest extends BaseQreditRequest implements HasBody
+class ChangeClearingStatusRequest extends BaseQreditRequest implements HasBody
 {
     use HasJsonBody;
     use HasMessageId;
@@ -25,12 +27,12 @@ class CreateOrderRequest extends BaseQreditRequest implements HasBody
     public function __construct(array $data)
     {
         $this->data = $data;
-        $this->messageIdType = 'order.create';
+        $this->messageIdType = 'payment.clearing';
     }
 
     public function resolveEndpoint(): string
     {
-        return '/orders';
+        return '/payments/changeClearingStatus';
     }
 
     protected function defaultBody(): array
@@ -39,14 +41,5 @@ class CreateOrderRequest extends BaseQreditRequest implements HasBody
             ['msgId' => $this->generateMessageId()],
             $this->data,
         );
-    }
-
-    protected function getMessageIdContext(): array
-    {
-        if (isset($this->data['clientReference'])) {
-            return ['ref' => $this->data['clientReference']];
-        }
-
-        return [];
     }
 }

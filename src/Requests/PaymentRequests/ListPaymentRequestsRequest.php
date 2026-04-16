@@ -46,18 +46,18 @@ class ListPaymentRequestsRequest extends BaseQreditRequest
     {
         $defaults = [
             'msgId' => $this->generateMessageId(),
+            'dateFrom' => $this->queryParams['dateFrom'] ?? date('d/m/Y', strtotime('-30 days')),
+            'dateTo' => $this->queryParams['dateTo'] ?? date('d/m/Y'),
             'max' => $this->queryParams['max'] ?? 50,
             'offset' => $this->queryParams['offset'] ?? 0,
         ];
 
-        // Add optional filters
         $optionalFields = [
             'reference',
+            'initPayment',
             'orderReference',
             'clientReference',
             'subCorporateId',
-            'dateFrom',
-            'dateTo',
             'currencyCode',
             'cityCode',
             'areaCode',

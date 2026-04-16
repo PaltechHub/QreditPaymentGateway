@@ -4,59 +4,45 @@ declare(strict_types=1);
 
 namespace Qredit\LaravelQredit\Requests\PaymentRequests;
 
-use Saloon\Enums\Method;
 use Qredit\LaravelQredit\Requests\BaseQreditRequest;
-use Saloon\Contracts\Body\HasBody;
-use Saloon\Traits\Body\HasJsonBody;
 use Qredit\LaravelQredit\Traits\HasMessageId;
+use Saloon\Contracts\Body\HasBody;
+use Saloon\Enums\Method;
+use Saloon\Traits\Body\HasJsonBody;
 
+/**
+ * DELETE /paymentRequests — swagger + merchant doc.
+ *
+ * Body: { msgId, reference, reason }. The reference lives in the body, not the URL.
+ */
 class CancelPaymentRequest extends BaseQreditRequest implements HasBody
 {
     use HasJsonBody;
     use HasMessageId;
 
-    /**
-     * The HTTP method of the request.
-     */
     protected Method $method = Method::DELETE;
 
-    /**
+    protected string $paymentRequestReference;
 
-    /**
-     * The payment request ID.
-     */
-    protected string $paymentRequestId;
-
-    /**
-     * Optional cancellation reason.
-     */
     protected ?string $reason;
 
-    /**
-     * Create a new cancel payment request.
-     */
-    public function __construct(string $paymentRequestId, ?string $reason = null)
+    public function __construct(string $paymentRequestReference, ?string $reason = null)
     {
-        $this->paymentRequestId = $paymentRequestId;
+        $this->paymentRequestReference = $paymentRequestReference;
         $this->reason = $reason;
+        $this->messageIdType = 'payment.cancel';
     }
 
-    /**
-     * Resolve the endpoint for the request.
-     */
     public function resolveEndpoint(): string
     {
-        return '/paymentRequests/' . $this->paymentRequestId;
+        return '/paymentRequests';
     }
 
-    /**
-     * Default body for the request.
-     */
     protected function defaultBody(): array
     {
         $body = [
             'msgId' => $this->generateMessageId(),
-            'transactionDate' => date('d/m/Y'),
+            'reference' => $this->paymentRequestReference,
         ];
 
         if ($this->reason !== null) {
@@ -65,5 +51,4 @@ class CancelPaymentRequest extends BaseQreditRequest implements HasBody
 
         return $body;
     }
-
 }

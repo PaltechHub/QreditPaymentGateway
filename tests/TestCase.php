@@ -136,9 +136,10 @@ abstract class TestCase extends Orchestra
      */
     protected function getTestConnector(): \Qredit\LaravelQredit\Connectors\QreditConnector
     {
-        return new \Qredit\LaravelQredit\Connectors\QreditConnector(
-            apiKey: 'test-api-key',
-            sandbox: true
-        );
+        return new \Qredit\LaravelQredit\Connectors\QreditConnector([
+            'api_key' => 'test-api-key',
+            'secret_key' => 'test-secret-key',
+            'sandbox' => true,
+        ]);
     }
 }

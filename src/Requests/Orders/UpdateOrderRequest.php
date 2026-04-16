@@ -4,62 +4,48 @@ declare(strict_types=1);
 
 namespace Qredit\LaravelQredit\Requests\Orders;
 
-use Saloon\Enums\Method;
 use Qredit\LaravelQredit\Requests\BaseQreditRequest;
-use Saloon\Contracts\Body\HasBody;
-use Saloon\Traits\Body\HasJsonBody;
 use Qredit\LaravelQredit\Traits\HasMessageId;
+use Saloon\Contracts\Body\HasBody;
+use Saloon\Enums\Method;
+use Saloon\Traits\Body\HasJsonBody;
 
+/**
+ * PUT /orders — swagger.
+ *
+ * Body carries `orderReference`; no resource id in the URL.
+ */
 class UpdateOrderRequest extends BaseQreditRequest implements HasBody
 {
     use HasJsonBody;
     use HasMessageId;
 
-    /**
-     * The HTTP method of the request.
-     */
     protected Method $method = Method::PUT;
 
-    /**
+    protected string $orderReference;
 
-    /**
-     * The order ID.
-     */
-    protected string $orderId;
-
-    /**
-     * The update data.
-     */
     protected array $data;
 
-    /**
-     * Create a new update order request.
-     */
-    public function __construct(string $orderId, array $data)
+    public function __construct(string $orderReference, array $data)
     {
-        $this->orderId = $orderId;
+        $this->orderReference = $orderReference;
         $this->data = $data;
+        $this->messageIdType = 'order.update';
     }
 
-    /**
-     * Resolve the endpoint for the request.
-     */
     public function resolveEndpoint(): string
     {
-        return '/orders/' . $this->orderId;
+        return '/orders';
     }
 
-    /**
-     * Default body for the request.
-     */
     protected function defaultBody(): array
     {
-        $defaultData = [
-            'msgId' => $this->generateMessageId(),
-            'transactionDate' => date('d/m/Y'),
-        ];
-
-        return array_merge($defaultData, $this->data);
+        return array_merge(
+            [
+                'msgId' => $this->generateMessageId(),
+                'orderReference' => $this->orderReference,
+            ],
+            $this->data,
+        );
     }
-
 }

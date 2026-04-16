@@ -46,26 +46,27 @@ class ListTransactionsRequest extends BaseQreditRequest
     {
         $defaults = [
             'msgId' => $this->generateMessageId(),
+            'dateFrom' => $this->queryParams['dateFrom'] ?? date('d/m/Y', strtotime('-30 days')),
+            'dateTo' => $this->queryParams['dateTo'] ?? date('d/m/Y'),
             'max' => $this->queryParams['max'] ?? 50,
             'offset' => $this->queryParams['offset'] ?? 0,
         ];
 
-        // Add optional filters
         $optionalFields = [
             'reference',
             'clientReference',
             'providerReference',
             'paymentRequestReference',
+            'settlementReference',
             'orderReference',
             'corporateId',
             'subCorporateId',
             'subCorporateAccountId',
-            'dateFrom',
-            'dateTo',
             'currencyCode',
             'operation',
             'onlyBalanceTransactions',
             'transactionStatus',
+            'clearingStatus',
             'sSearch',
             'orderColumnName',
             'orderDirection',

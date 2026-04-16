@@ -5,33 +5,89 @@ All notable changes to `qredit-laravel` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-04-14
+
+Major release — multi-tenancy first-class, signing rewritten for production correctness.
+
+### Breaking changes
+
+- **`Qredit::make([...])` factory supersedes the positional constructor** for per-tenant usage. Old positional usage (`new Qredit($apiKey, $sandbox, $skipAuth)`) is preserved for back-compat but deprecated.
+- **Facade now resolves to `QreditManager`** (not `Qredit`). Existing direct calls (`Qredit::createOrder(...)`) continue to work via `__call` delegation — no change required unless you were introspecting the concrete class.
+- **Cancel / update endpoints moved resource id to body.** Calls like `CancelPaymentRequest('REF-1', 'reason')` now build `DELETE /paymentRequests` with `{ reference: 'REF-1', reason }` body (was `DELETE /paymentRequests/REF-1`). Matches swagger + merchant guide.
+- **`QREDIT_SDK_ENABLED` + `QREDIT_WEBHOOK_SECRET` removed.** Signing is now always on; webhook verification uses the same per-tenant secret as outgoing signing.
+- **Default sandbox URL changed** from `http://185.57.122.58:2030/...` to `https://apitest.qredit.tech/gw-checkout/api/v1`. Set `QREDIT_SANDBOX_URL` in `.env` to restore the old host if needed.
+- **Default production URL fixed** from `api.qredit.com` to `api.qredit.tech`.
+
+### Added
+
+- **HMAC SHA512 request signing** (merchant guide §7) — every outgoing request now carries `Authorization: HmacSHA512_O <hex>`, computed in `BaseQreditRequest::boot()`. Golden-vector unit tests in `tests/Unit/HmacSignerTest.php`.
+- **Multi-tenant contracts** — `CredentialProvider` and `TenantResolver` bound in the service provider. Default `ConfigCredentialProvider` + `NullTenantResolver` preserve single-tenant behavior without configuration.
+- **`QreditCredentials` value object** for typed per-tenant credential bundles.
+- **Built-in tenant resolvers** — `SubdomainTenantResolver`, `HeaderTenantResolver`, `CallbackTenantResolver`, `NullTenantResolver`.
+- **`QreditManager`** — facade target with per-tenant client cache. Exposes `Qredit::current()`, `Qredit::forTenant($id)`, `Qredit::fake($fakes)`, `Qredit::flush()`.
+- **`SignController`** — ready-made `/qredit/sign` endpoint for the BlockBuilders checkout widget. One-line registration via `Route::qreditSign()`.
+- **`WebhookController` refactor** — per-tenant verification through `TenantResolver::tenantIdFromWebhook()`. One-line registration via `Route::qreditWebhook()`.
+- **Route macros** — `Route::qreditSign()` and `Route::qreditWebhook($path)` cover every app's integration in two lines.
+- **`FakeQredit` test double** — `tests/*.php` can now use `Qredit::fake(new FakeQredit([...]))` with `assertCalled`, `assertNotCalled`, `assertCalledWith` helpers.
+- **New request wrappers** — `GenerateQRRequest`, `CalculateFeesRequest`, `InitPaymentRequest`, `ChangeClearingStatusRequest`. Full swagger coverage.
+- **`qredit:call` artisan CLI** — signed-request CLI that replaces Postman. Supports every endpoint, inline JSON payloads, file payloads, `--dry-run` mode.
+- **`qredit:install` artisan command** — one-shot onboarding for new consumers (single-tenant and multi-tenant modes).
+- **Comprehensive docs** — `docs/MULTITENANCY.md`, `docs/SIGNING.md`, `docs/WEBHOOKS.md`, `docs/TESTING.md`, `docs/TROUBLESHOOTING.md`. Full API shape reference in `docs/API_REFERENCE.md`.
+- **`examples/MultiTenantUsage.php`** + **`examples/WebhookHandler.php`**.
+
+### Changed
+
+- Token cache keys namespaced by `sha1($apiKey)` — multiple tenants can share one Laravel cache store.
+- `listOrders`, `listPayments`, `listTransactions` now default `dateFrom` / `dateTo` to the last 30 days when omitted (gateway requires them).
+- `BasicUsage.php` rewritten to demonstrate the new API shape.
+- `config/qredit.php` restructured:
+  - Added `signing.scheme` + `signing.case`
+  - Added top-level `secret_key`
+  - Removed dead `client.authorization`, `sdk_enabled`, `webhook_secret`
+
+### Fixed
+
+- `GetTokenRequest` now sends `{msgId, apiKey}` in the JSON body per merchant guide §2; the spurious `X-API-Key` header was removed from the connector.
+- `CancelPaymentRequest` and `CancelOrderRequest` now target the correct swagger endpoints (`DELETE /paymentRequests` and `DELETE /orders` with reference in body).
+- `UpdateOrderRequest` and `UpdatePaymentRequest` target `PUT /orders` / `PUT /paymentRequests` (body-carried reference).
+- Removed invented `transactionDate` field from request bodies — it's not in the merchant guide or swagger.
+
+### Security
+
+- Secret keys never leave the merchant server. The ready-made `SignController` signs on behalf of the browser widget without exposing the secret.
+- `Qredit::getCachedToken()` / `cacheToken()` now tolerate missing cache tables — CLI / testbench environments without a cache backend no longer crash.
+
+---
+
 ## [0.1.1] - 2025-12-31
 
 ### Added
 - **Customer Management**
-  - ListCustomersRequest - List merchant customers with filtering (name, phone, email, idNumber)
-  - listCustomers() method in Qredit service class
-  - Message ID prefix: customer.list
+  - ListCustomersRequest — list merchant customers with filtering (name, phone, email, idNumber)
+  - `listCustomers()` method in the Qredit service class
+  - Message ID prefix: `customer.list`
 - **Transaction Management**
-  - ListTransactionsRequest - List transactions/payments with comprehensive filtering
-  - listTransactions() method in Qredit service class
+  - ListTransactionsRequest — list transactions/payments with comprehensive filtering
+  - `listTransactions()` method in the Qredit service class
   - Support for filtering by status, date range, currency, corporate IDs
-  - Message ID prefix: transaction.list
+  - Message ID prefix: `transaction.list`
 - **Configuration Improvements**
-  - Added sandbox_url configuration option to eliminate hardcoded URLs
+  - Added `sandbox_url` configuration option to eliminate hardcoded URLs
   - Configurable sandbox and production API URLs via environment variables
-  - QREDIT_SANDBOX_URL environment variable support
+  - `QREDIT_SANDBOX_URL` environment variable support
 
 ### Fixed
-- Removed hardcoded API URLs - now fully configurable via config
-- Fixed Saloon v3 compatibility issues with boot() method signature
-- Resolved property conflicts between HasMessageId trait and request classes
-- Fixed $query property naming conflicts with Saloon base classes (renamed to $queryParams)
-- Corrected messageIdType property inheritance issues
+- Removed hardcoded API URLs — now fully configurable via config
+- Fixed Saloon v3 compatibility issues with `boot()` method signature
+- Resolved property conflicts between `HasMessageId` trait and request classes
+- Fixed `$query` property naming conflicts with Saloon base classes (renamed to `$queryParams`)
+- Corrected `messageIdType` property inheritance issues
 
 ### Changed
-- All List request classes now use $queryParams instead of $query to avoid Saloon conflicts
-- Updated boot() method signature to match Saloon v3 requirements
+- All List request classes now use `$queryParams` instead of `$query` to avoid Saloon conflicts
+- Updated `boot()` method signature to match Saloon v3 requirements
+
+---
 
 ## [0.1.0] - 2025-12-31
 
@@ -44,54 +100,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - TokenManager service for intelligent token lifecycle management
 - **Unique Message ID System**
   - Every request includes a unique message ID with microsecond precision
-  - Type-specific prefixes (auth_token_, pr_create_, ord_get_, etc.)
-  - HasMessageId trait for automatic ID generation in all requests
-  - MessageIdGenerator helper with validation and parsing utilities
+  - Type-specific prefixes (`auth_token_`, `pr_create_`, `ord_get_`, etc.)
+  - `HasMessageId` trait for automatic ID generation in all requests
+  - `MessageIdGenerator` helper with validation and parsing utilities
 - **Payment Request Management**
-  - CreatePaymentRequest - Initialize new payment requests
-  - GetPaymentRequest - Retrieve payment details by ID
-  - UpdatePaymentRequest - Modify existing payments
-  - CancelPaymentRequest - Cancel with optional reason
-  - ListPaymentRequestsRequest - List with pagination and filters
+  - `CreatePaymentRequest`, `GetPaymentRequest`, `UpdatePaymentRequest`, `CancelPaymentRequest`, `ListPaymentRequestsRequest`
 - **Order Management**
-  - CreateOrderRequest - Register new orders
-  - GetOrderRequest - Retrieve order details
-  - UpdateOrderRequest - Modify order information
-  - CancelOrderRequest - Cancel orders with reason
-  - ListOrdersRequest - List with filtering support
+  - `CreateOrderRequest`, `GetOrderRequest`, `UpdateOrderRequest`, `CancelOrderRequest`, `ListOrdersRequest`
 - **Configuration System**
-  - Comprehensive config/qredit.php with all settings
-  - Configurable Client headers via config (Client-Type, Client-Version, Authorization)
-  - Authorization header (HmacSHA512_O) included by default, removed when SDK mode enabled
+  - Comprehensive `config/qredit.php` with all settings
+  - Configurable Client headers (Client-Type, Client-Version, Authorization)
   - Multi-language support (EN, AR) for API responses
-  - Environment-based configuration via .env
+  - Environment-based configuration via `.env`
 - **Developer Experience**
-  - Built with Saloon v3 HTTP client for robust API communication
-  - PEST PHP testing framework with comprehensive test suite
+  - Built with Saloon v3 HTTP client
+  - PEST PHP testing framework
   - Custom exceptions for better error handling
-  - PSR-compliant architecture and coding standards
 - **Framework Compatibility**
-  - Full support for Laravel 10, 11, and 12
-  - PHP 8.1, 8.2, 8.3, and 8.4 compatibility
+  - Laravel 10, 11, 12 support
+  - PHP 8.1, 8.2, 8.3, 8.4 support
   - Laravel package auto-discovery
-  - Service provider with automatic registration
 - **Security & Performance**
-  - Webhook signature verification for secure callbacks
-  - Token hashing before storage
-  - Intelligent token caching reduces API calls by 95%
+  - Webhook signature verification
+  - Intelligent token caching (95% fewer API calls)
   - Retry mechanism with exponential backoff
-  - Authorization header support (HmacSHA512_O) when SDK mode is disabled
-  - BaseQreditRequest class for consistent header management across all requests
-- **Documentation & CI/CD**
-  - Comprehensive README with setup instructions
-  - Detailed MESSAGE_ID_UNIQUENESS.md documentation
-  - GitHub Actions workflow for automated testing
-  - Security policy and contribution guidelines
 
-## Support
-
-For support, please email support@qredit.com or visit our [documentation](https://docs.qredit.com).
+---
 
 ## License
 
-The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
+MIT — see [LICENSE.md](LICENSE.md).

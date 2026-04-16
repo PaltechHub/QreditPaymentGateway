@@ -5,114 +5,82 @@ declare(strict_types=1);
 namespace Qredit\LaravelQredit;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Route;
+use Qredit\LaravelQredit\Contracts\CredentialProvider;
+use Qredit\LaravelQredit\Contracts\TenantResolver;
+use Qredit\LaravelQredit\Routing\RouteMacros;
+use Qredit\LaravelQredit\Tenancy\ConfigCredentialProvider;
+use Qredit\LaravelQredit\Tenancy\NullTenantResolver;
 
 class QreditServiceProvider extends ServiceProvider
 {
-    /**
-     * Bootstrap any package services.
-     */
     public function boot(): void
     {
+        RouteMacros::register();
+
         $this->registerPublishing();
-        $this->registerRoutes();
         $this->registerCommands();
     }
 
-    /**
-     * Register any package services.
-     */
     public function register(): void
     {
-        $this->mergeConfigFrom(
-            __DIR__ . '/../config/qredit.php',
-            'qredit'
-        );
+        $this->mergeConfigFrom(__DIR__.'/../config/qredit.php', 'qredit');
 
-        $this->app->singleton(Qredit::class, function ($app) {
-            return new Qredit(
-                config('qredit.api_key'),
-                config('qredit.sandbox', true)
+        // Multi-tenancy defaults — host apps override these bindings.
+        $this->app->singleton(CredentialProvider::class, ConfigCredentialProvider::class);
+        $this->app->singleton(TenantResolver::class, NullTenantResolver::class);
+
+        // Central manager — owns per-tenant client cache.
+        $this->app->singleton(QreditManager::class, function ($app) {
+            return new QreditManager(
+                $app->make(CredentialProvider::class),
+                $app->make(TenantResolver::class),
             );
         });
 
-        $this->app->alias(Qredit::class, 'qredit');
+        // `Qredit` facade → QreditManager (NOT the raw Qredit client), so single-tenant
+        // consumers still get transparent `Qredit::createOrder(...)` calls, and
+        // multi-tenant consumers also get `Qredit::forTenant('x')->createOrder(...)`.
+        $this->app->alias(QreditManager::class, 'qredit');
+
+        // Keep a direct binding for code that wants the raw Qredit client.
+        $this->app->bind(Qredit::class, fn ($app) => $app->make(QreditManager::class)->current());
     }
 
-    /**
-     * Register the package's publishable resources.
-     */
     protected function registerPublishing(): void
     {
-        if ($this->app->runningInConsole()) {
-            // Publish config
-            $this->publishes([
-                __DIR__ . '/../config/qredit.php' => config_path('qredit.php'),
-            ], 'qredit-config');
-
-            // Publish migrations
-            $this->publishes([
-                __DIR__ . '/../database/migrations' => database_path('migrations'),
-            ], 'qredit-migrations');
-
-            // Publish views (if we add any later)
-            $this->publishes([
-                __DIR__ . '/../resources/views' => resource_path('views/vendor/qredit'),
-            ], 'qredit-views');
-
-            // Publish all assets
-            $this->publishes([
-                __DIR__ . '/../config/qredit.php' => config_path('qredit.php'),
-                __DIR__ . '/../database/migrations' => database_path('migrations'),
-            ], 'qredit');
+        if (! $this->app->runningInConsole()) {
+            return;
         }
+
+        $this->publishes([
+            __DIR__.'/../config/qredit.php' => config_path('qredit.php'),
+        ], 'qredit-config');
+
+        $this->publishes([
+            __DIR__.'/../database/migrations' => database_path('migrations'),
+        ], 'qredit-migrations');
     }
 
-    /**
-     * Register the package routes.
-     */
-    protected function registerRoutes(): void
-    {
-        if (config('qredit.webhook.enabled', false)) {
-            Route::group($this->webhookRouteConfiguration(), function () {
-                Route::post(
-                    config('qredit.webhook.path', '/qredit/webhook'),
-                    [Controllers\WebhookController::class, 'handle']
-                )->name('qredit.webhook');
-            });
-        }
-    }
-
-    /**
-     * Get the webhook route group configuration.
-     */
-    protected function webhookRouteConfiguration(): array
-    {
-        return [
-            'prefix' => config('qredit.webhook.prefix', ''),
-            'middleware' => config('qredit.webhook.middleware', []),
-        ];
-    }
-
-    /**
-     * Register the package's artisan commands.
-     */
     protected function registerCommands(): void
     {
-        if ($this->app->runningInConsole()) {
-            $this->commands([
-                Commands\QreditTestCommand::class,
-            ]);
+        if (! $this->app->runningInConsole()) {
+            return;
         }
+
+        $this->commands([
+            Commands\QreditTestCommand::class,
+            Commands\CallApiCommand::class,
+            Commands\InstallCommand::class,
+        ]);
     }
 
-    /**
-     * Get the services provided by the provider.
-     */
     public function provides(): array
     {
         return [
             Qredit::class,
+            QreditManager::class,
+            CredentialProvider::class,
+            TenantResolver::class,
             'qredit',
         ];
     }

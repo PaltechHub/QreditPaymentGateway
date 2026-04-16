@@ -4,59 +4,45 @@ declare(strict_types=1);
 
 namespace Qredit\LaravelQredit\Requests\Orders;
 
-use Saloon\Enums\Method;
 use Qredit\LaravelQredit\Requests\BaseQreditRequest;
-use Saloon\Contracts\Body\HasBody;
-use Saloon\Traits\Body\HasJsonBody;
 use Qredit\LaravelQredit\Traits\HasMessageId;
+use Saloon\Contracts\Body\HasBody;
+use Saloon\Enums\Method;
+use Saloon\Traits\Body\HasJsonBody;
 
+/**
+ * DELETE /orders — swagger.
+ *
+ * Body: { msgId, orderReference, reason }.
+ */
 class CancelOrderRequest extends BaseQreditRequest implements HasBody
 {
     use HasJsonBody;
     use HasMessageId;
 
-    /**
-     * The HTTP method of the request.
-     */
     protected Method $method = Method::DELETE;
 
-    /**
+    protected string $orderReference;
 
-    /**
-     * The order ID.
-     */
-    protected string $orderId;
-
-    /**
-     * The cancellation reason.
-     */
     protected ?string $reason;
 
-    /**
-     * Create a new cancel order request.
-     */
-    public function __construct(string $orderId, ?string $reason = null)
+    public function __construct(string $orderReference, ?string $reason = null)
     {
-        $this->orderId = $orderId;
+        $this->orderReference = $orderReference;
         $this->reason = $reason;
+        $this->messageIdType = 'order.cancel';
     }
 
-    /**
-     * Resolve the endpoint for the request.
-     */
     public function resolveEndpoint(): string
     {
-        return '/orders/' . $this->orderId;
+        return '/orders';
     }
 
-    /**
-     * Default body for the request.
-     */
     protected function defaultBody(): array
     {
         $body = [
             'msgId' => $this->generateMessageId(),
-            'transactionDate' => date('d/m/Y'),
+            'orderReference' => $this->orderReference,
         ];
 
         if ($this->reason !== null) {
@@ -65,5 +51,4 @@ class CancelOrderRequest extends BaseQreditRequest implements HasBody
 
         return $body;
     }
-
 }

@@ -4,136 +4,163 @@ declare(strict_types=1);
 
 namespace Qredit\LaravelQredit\Connectors;
 
-use Saloon\Http\Connector;
-use Saloon\Traits\Plugins\HasTimeout;
-use Saloon\Traits\Plugins\AcceptsJson;
-use Saloon\Contracts\Authenticator;
-use Saloon\Http\Response;
-use Saloon\Http\PendingRequest;
-use Saloon\Exceptions\Request\FatalRequestException;
-use Saloon\Exceptions\Request\RequestException;
+use Illuminate\Support\Facades\Log;
 use Qredit\LaravelQredit\Exceptions\QreditApiException;
 use Qredit\LaravelQredit\Exceptions\QreditAuthenticationException;
+use Qredit\LaravelQredit\Security\HmacSigner;
+use Saloon\Contracts\Authenticator;
+use Saloon\Exceptions\Request\FatalRequestException;
+use Saloon\Exceptions\Request\RequestException;
+use Saloon\Http\Connector;
+use Saloon\Http\PendingRequest;
+use Saloon\Http\Response;
+use Saloon\Traits\Plugins\AcceptsJson;
+use Saloon\Traits\Plugins\HasTimeout;
 
+/**
+ * Per-tenant Qredit connector.
+ *
+ * Holds one tenant's credentials (apiKey, secretKey, environment) plus signing options.
+ * Multiple instances can coexist in the same Laravel process — this is what enables
+ * SAAS deployments where each channel has its own Qredit account.
+ */
 class QreditConnector extends Connector
 {
-    use HasTimeout;
     use AcceptsJson;
+    use HasTimeout;
 
-    /**
-     * Connection timeout in seconds.
-     */
     protected int $connectTimeout = 30;
 
-    /**
-     * Request timeout in seconds.
-     */
     protected int $requestTimeout = 60;
 
-    /**
-     * The authentication token.
-     */
     protected ?string $authToken = null;
 
-    /**
-     * The API key for authentication.
-     */
     protected string $apiKey;
 
-    /**
-     * Whether to use sandbox environment.
-     */
+    protected string $secretKey;
+
     protected bool $sandbox;
 
-    /**
-     * Create a new Qredit connector instance.
-     */
-    public function __construct(string $apiKey, bool $sandbox = false)
-    {
-        $this->apiKey = $apiKey;
-        $this->sandbox = $sandbox;
-    }
+    protected string $sandboxUrl;
+
+    protected string $productionUrl;
+
+    protected string $authScheme;
+
+    protected string $signatureCase;
+
+    protected string $language;
 
     /**
-     * Resolve the base URL of the API.
+     * Accepts either the new array options shape OR the legacy positional
+     * signature ($apiKey, $sandbox) for back-compat with pre-0.2 tests.
+     *
+     * @param  array<string, mixed>|string  $options  Full credential set — see Qredit::make().
      */
+    public function __construct(array|string $options, ?bool $sandbox = null)
+    {
+        // Legacy positional constructor.
+        if (is_string($options)) {
+            $options = [
+                'api_key' => $options,
+                'secret_key' => config('qredit.secret_key', ''),
+                'sandbox' => $sandbox ?? true,
+            ];
+        }
+
+        $this->apiKey = $options['api_key'] ?? '';
+        $this->secretKey = $options['secret_key'] ?? '';
+        $this->sandbox = (bool) ($options['sandbox'] ?? true);
+        $this->sandboxUrl = $options['sandbox_url'] ?? config('qredit.sandbox_url');
+        $this->productionUrl = $options['production_url'] ?? config('qredit.production_url');
+        $this->authScheme = $options['auth_scheme'] ?? config('qredit.signing.scheme');
+        $this->signatureCase = $options['signature_case'] ?? config('qredit.signing.case', HmacSigner::CASE_LOWER);
+        $this->language = $options['language'] ?? config('qredit.language', 'EN');
+    }
+
     public function resolveBaseUrl(): string
     {
-        return $this->sandbox
-            ? config('qredit.sandbox_url', 'http://185.57.122.58:2030/gw-checkout/api/v1')
-            : config('qredit.production_url', 'https://api.qredit.com/gw-checkout/api/v1');
+        return $this->sandbox ? $this->sandboxUrl : $this->productionUrl;
     }
 
     /**
-     * Default headers for every request.
+     * Headers attached to every outbound request by Saloon.
+     *
+     * NOTE: the signed `Authorization` header is NOT set here — it's computed per
+     * request in BaseQreditRequest::boot(), once the body/query are materialized.
      */
     protected function defaultHeaders(): array
     {
         $headers = [
-            'Content-Type' => 'application/json',
             'Accept' => 'application/json',
-            'X-API-Key' => $this->apiKey,
+            'Accept-Language' => $this->language,
+            'Client-Type' => config('qredit.client.type', 'MP'),
+            'Client-Version' => config('qredit.client.version', '1.0.0'),
         ];
 
-        // Add authentication token as X-Auth-Token header if available
-        if ($this->authToken) {
+        if ($this->authToken !== null) {
             $headers['X-Auth-Token'] = $this->authToken;
-        }
-
-        // Add language header if configured
-        if ($language = config('qredit.language')) {
-            $headers['Accept-Language'] = $language;
         }
 
         return $headers;
     }
 
     /**
-     * Default authentication for requests.
-     * We don't use Saloon's built-in auth since Qredit uses X-Auth-Token header
+     * Qredit auth is body-based (POST /auth/token with {apiKey}) + X-Auth-Token on subsequent
+     * calls. Saloon's built-in authenticators don't fit, so we return null and manage it manually.
      */
     protected function defaultAuth(): ?Authenticator
     {
-        // We handle auth token in defaultHeaders() as X-Auth-Token
         return null;
     }
 
-    /**
-     * Set the authentication token.
-     */
     public function setAuthToken(string $token): self
     {
         $this->authToken = $token;
+
         return $this;
     }
 
-    /**
-     * Get the authentication token.
-     */
     public function getAuthToken(): ?string
     {
         return $this->authToken;
     }
 
-    /**
-     * Get the API key.
-     */
+    public function clearAuthToken(): void
+    {
+        $this->authToken = null;
+    }
+
     public function getApiKey(): string
     {
         return $this->apiKey;
     }
 
-    /**
-     * Check if using sandbox mode.
-     */
+    public function getSecretKey(): string
+    {
+        return $this->secretKey;
+    }
+
+    public function getAuthScheme(): string
+    {
+        return $this->authScheme;
+    }
+
+    public function getSignatureCase(): string
+    {
+        return $this->signatureCase;
+    }
+
+    public function getLanguage(): string
+    {
+        return $this->language;
+    }
+
     public function isSandbox(): bool
     {
         return $this->sandbox;
     }
 
-    /**
-     * Handle failed requests.
-     */
     public function handleRequestFailed(Response $response, FatalRequestException|RequestException $exception): void
     {
         $body = $response->json();
@@ -147,19 +174,15 @@ class QreditConnector extends Connector
         throw new QreditApiException(
             message: $message,
             code: $code,
-            response: $body
+            response: $body ?? []
         );
     }
 
-    /**
-     * Boot the connector (Saloon v3 compatibility).
-     */
     public function boot(PendingRequest $pendingRequest): void
     {
-        // Add debugging if enabled
         if (config('qredit.debug', false)) {
             $pendingRequest->middleware()->onRequest(function (PendingRequest $request) {
-                \Illuminate\Support\Facades\Log::debug('Qredit API Request', [
+                Log::debug('Qredit API Request', [
                     'method' => $request->getMethod(),
                     'url' => $request->getUrl(),
                     'headers' => $request->headers()->all(),
@@ -168,7 +191,7 @@ class QreditConnector extends Connector
             });
 
             $pendingRequest->middleware()->onResponse(function (Response $response) {
-                \Illuminate\Support\Facades\Log::debug('Qredit API Response', [
+                Log::debug('Qredit API Response', [
                     'status' => $response->status(),
                     'body' => $response->json(),
                 ]);
