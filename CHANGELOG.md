@@ -5,6 +5,34 @@ All notable changes to `qredit-laravel` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-04-16
+
+Algorithm correction — confirmed against live UAT (auth/token returned a JWT).
+
+### Breaking changes
+
+- **HMAC key derivation simplified.** Was a port of the Angular/crypto-js
+  reference (base64-decode → UTF-8 TextDecoder → UTF-16 low-byte truncation
+  → raw MD5). Now a straight `md5($secret . $msgId, raw: true)`. The gateway
+  server-side verifier for **TP clients** uses the simpler form; the Angular
+  widget targets a different client variant.
+- **`Client-Type` header fixed to `TP`** as a class constant. Other values lock
+  the caller out of `/auth/token`. `QREDIT_CLIENT_TYPE` env var no longer
+  honored.
+- **`Client-Version` header dynamic.** Derived at runtime from the SDK's
+  composer version (`ccc<semver>`). `QREDIT_CLIENT_VERSION` now only pins an
+  explicit string if Qredit has negotiated one with you.
+- **Signature case defaults to `upper`.** Live UAT accepts only uppercase hex;
+  `QREDIT_SIGNATURE_CASE=lower` will now fail with `1004 Bad Signature`.
+- **Golden vectors regenerated** in `tests/Unit/HmacSignerTest.php` — old
+  test hashes no longer valid.
+
+### Changed
+
+- [`docs/SIGNING.md`](docs/SIGNING.md) rewritten to document the real algorithm.
+- [`docs/QREDIT_SIGNATURE_ISSUE.md`](docs/QREDIT_SIGNATURE_ISSUE.md) marked as
+  resolved; retained as a historical record of the debugging arc.
+
 ## [0.2.0] - 2026-04-14
 
 Major release — multi-tenancy first-class, signing rewritten for production correctness.

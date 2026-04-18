@@ -49,23 +49,21 @@ describe('HmacSigner — message assembly', function () {
 
 describe('HmacSigner — key derivation', function () {
 
-    it('base64-decodes the secret, UTF-8-normalises it, appends the msgId, and takes the raw md5 as key bytes', function () {
-        // Confirmed against the Node reference:
-        //   secret  = 'B9E0236B77E5C16B1F3540265920C7E0C541622E66C4F76FBC53BC990F11E496'
-        //   msgId   = 'probe-abc123'
-        //   keyHex  = 'ff8667d31bb8f723cda2b5f6e675c320'
+    it('takes the raw MD5 of (secret . msgId) as the 16-byte HMAC key', function () {
+        // Confirmed against live UAT (auth/token returned a JWT):
+        //   secret = 'B9E0236B77E5C16B1F3540265920C7E0C541622E66C4F76FBC53BC990F11E496'
+        //   msgId  = 'probe-abc123'
+        //   keyHex = '06bcaf6c7d423bec7df7b0e32abac714'
         $key = HmacSigner::deriveKey(
             'B9E0236B77E5C16B1F3540265920C7E0C541622E66C4F76FBC53BC990F11E496',
             'probe-abc123',
         );
 
-        expect(bin2hex($key))->toBe('ff8667d31bb8f723cda2b5f6e675c320')
+        expect(bin2hex($key))->toBe('06bcaf6c7d423bec7df7b0e32abac714')
             ->and(strlen($key))->toBe(16);
     });
 
-    it('uses U+FFFD for invalid UTF-8 sequences, matching the Angular TextDecoder default', function () {
-        // A secret whose base64 decodes to an invalid-UTF-8 byte must still produce
-        // a deterministic key (not throw).
+    it('produces a deterministic 16-byte key for any input without throwing', function () {
         $key = HmacSigner::deriveKey('////', 'x');
 
         expect(strlen($key))->toBe(16)
@@ -87,7 +85,7 @@ describe('HmacSigner — signature output', function () {
             ->toMatch('/^[A-F0-9]{128}$/');
     });
 
-    it('matches the Angular-reference output for (secret, msgId=probe-abc123, apiKey) — byte-identical', function () {
+    it('matches the live-UAT output for (secret, msgId=probe-abc123, apiKey)', function () {
         $sig = HmacSigner::sign(
             'B9E0236B77E5C16B1F3540265920C7E0C541622E66C4F76FBC53BC990F11E496',
             'probe-abc123',
@@ -95,12 +93,12 @@ describe('HmacSigner — signature output', function () {
         );
 
         expect($sig)->toBe(
-            '06EE49899C99BE6C38691253D6F950FDC5B3332AEA75BB6C24712141C7707D3A'
-            .'7C4D5C4336AFB36286FA0927E8F13C88A84E8478ADF417EC23C94D12CC8BB381'
+            'BDDCA9E14E3BF18F413853BA1A03C2B077977D937AD700A639C3D60E85B50856'
+            .'3F045529287F8927069477DB8D94F1A1C9142C9A480AC953ABE0BF3E52965A7D'
         );
     });
 
-    it('matches the Angular-reference output for (secret=CF63..., msgId=01062571545OiZoS)', function () {
+    it('matches the live-UAT output for (secret=CF63..., msgId=01062571545OiZoS)', function () {
         $sig = HmacSigner::sign(
             'CF63DBB1ADCEEBD3451985746B7D619998CB8E8AAC00715660D0CC911484B335',
             '01062571545OiZoS',
@@ -108,13 +106,12 @@ describe('HmacSigner — signature output', function () {
         );
 
         expect($sig)->toBe(
-            '657273D7F55DE4DC0002B2F5ACEC123909A3AC65184A7B8DC6478E236FC81EE0'
-            .'F6E8ACE7EB6845173F67C0DAA4B4BC3CD3FA2BC99D404F6D7DB89D76A949A06E'
+            '1C6122C3F47B02C363193091A9C6EE2A2EF54272233E026211016F954F046D36'
+            .'1C4A7080679BE5E6BDCC7C3A5D245FEEC48CCCEB14472F4FFB0C4E373CDF05F5'
         );
     });
 
-    it('matches the Angular-reference output for a simple base64 secret', function () {
-        // base64('Aladdin:open sesame') = 'QWxhZGRpbjpvcGVuIHNlc2FtZQ=='
+    it('matches the live-UAT output for a simple base64 secret', function () {
         $sig = HmacSigner::sign(
             'QWxhZGRpbjpvcGVuIHNlc2FtZQ==',
             'hello',
@@ -122,8 +119,8 @@ describe('HmacSigner — signature output', function () {
         );
 
         expect($sig)->toBe(
-            '992BFA976D766C85AE6A51B20218B6AEDAA0BC613AF80BE533D0294F5B4AA6DE'
-            .'919556671F0FB5343B08DDEB190C12995BF35E061887AFD3665331E046ACEED1'
+            '11C4175C3B5CBB409321AE72AA527497DB185FC1E0DCCE3AB58C847FA8CCC0AE'
+            .'2082ED99E785309D38B4DBDD7A484F41E1179C591E0F984244C4D7920930F2CA'
         );
     });
 

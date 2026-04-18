@@ -67,6 +67,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Supported Locales
+    |--------------------------------------------------------------------------
+    |
+    | Locale definitions used by the SDK's checkout views (payment-method
+    | component, redirect page). Each entry declares its text direction so
+    | the views render RTL/LTR automatically without hardcoding locale codes.
+    |
+    | Add your own locales here; the SDK checks `direction` to set `dir=`.
+    |
+    */
+    'locales' => [
+        ['code' => 'en', 'direction' => 'ltr', 'native' => 'English'],
+        ['code' => 'ar', 'direction' => 'rtl', 'native' => 'العربية'],
+        ['code' => 'he', 'direction' => 'rtl', 'native' => 'עברית'],
+        ['code' => 'fa', 'direction' => 'rtl', 'native' => 'فارسی'],
+        ['code' => 'ur', 'direction' => 'rtl', 'native' => 'اردو'],
+        ['code' => 'fr', 'direction' => 'ltr', 'native' => 'Français'],
+        ['code' => 'tr', 'direction' => 'ltr', 'native' => 'Türkçe'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Client Configuration
     |--------------------------------------------------------------------------
     |
@@ -75,8 +97,20 @@ return [
     |
     */
     'client' => [
-        'type' => env('QREDIT_CLIENT_TYPE', 'MP'),
-        'version' => env('QREDIT_CLIENT_VERSION', '1.0.0'),
+        /*
+        | Gateway-side client-type / version handshake.
+        |
+        | - `type` is fixed to 'TP' — the tenant-platform flavor the gateway
+        |   expects. Don't override; other values lock you out of /auth/token.
+        | - `version` is REQUIRED and must be set per tenant. Qredit issues a
+        |   unique Client-Version string per merchant account (e.g. 'ccc1.0',
+        |   'abc2.3'). In single-tenant deployments, set QREDIT_CLIENT_VERSION
+        |   in .env. In multi-tenant deployments, bind a custom
+        |   CredentialProvider that supplies it per tenant — there is NO
+        |   package-level default.
+        */
+        'type' => 'TP',
+        'version' => env('QREDIT_CLIENT_VERSION'),
     ],
 
     /*
@@ -105,6 +139,23 @@ return [
     |
     */
     'debug' => env('QREDIT_DEBUG', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | API Explorer (development tool)
+    |--------------------------------------------------------------------------
+    |
+    | An in-browser Postman replacement for testing signed Qredit requests.
+    | Guarded by super-admin auth + this toggle. NEVER enable in production —
+    | it exposes raw API responses and accepts arbitrary payloads.
+    |
+    | `path` controls the URL slug so you can obscure it from scanners.
+    |
+    */
+    'explorer' => [
+        'enabled' => env('QREDIT_API_EXPLORER', false),
+        'path' => env('QREDIT_API_EXPLORER_PATH', 'qredit-explorer'),
+    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -143,7 +194,7 @@ return [
     |
     */
     'webhook' => [
-        'enabled' => env('QREDIT_WEBHOOK_ENABLED', false),
+        'enabled' => env('QREDIT_WEBHOOK_ENABLED', true),
         'path' => env('QREDIT_WEBHOOK_PATH', '/qredit/webhook'),
         'prefix' => env('QREDIT_WEBHOOK_PREFIX', ''),
         'middleware' => [

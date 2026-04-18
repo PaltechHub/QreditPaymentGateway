@@ -32,7 +32,7 @@ use Qredit\LaravelQredit\Qredit;
  * The facade resolves to a singleton built from config.
  */
 $token = QreditFacade::authenticate();
-echo "Token (first 20 chars): ".substr($token, 0, 20)."...\n";
+echo 'Token (first 20 chars): '.substr($token, 0, 20)."...\n";
 
 // ===========================================================================
 // 2. BUILDING A CLIENT — PER-TENANT (SAAS / MULTI-CHANNEL)
@@ -56,7 +56,7 @@ $client = Qredit::make([
     'secret_key' => 'B9E0236B77E5C16B1F3540265920C7E0C541622E66C4F76FBC53BC990F11E496',
     'sandbox' => true,
     'language' => 'EN',
-    'signature_case' => 'lower',
+    'signature_case' => 'upper',
 ]);
 
 // ===========================================================================
@@ -96,7 +96,7 @@ try {
     $orderReference = $order['records'][0]['orderReference'] ?? null;
     echo "Order created: {$orderReference}\n";
 } catch (QreditApiException $e) {
-    echo "createOrder failed: ".$e->getMessage()." (code {$e->getCode()})\n";
+    echo 'createOrder failed: '.$e->getMessage()." (code {$e->getCode()})\n";
     print_r($e->getResponse());
 }
 
@@ -139,7 +139,7 @@ try {
     echo "Payment request: {$paymentReference}\n";
     echo "Checkout URL:    {$checkoutUrl}\n";
 } catch (QreditApiException $e) {
-    echo "createPayment failed: ".$e->getMessage()."\n";
+    echo 'createPayment failed: '.$e->getMessage()."\n";
 }
 
 // ===========================================================================
@@ -264,9 +264,13 @@ class QreditWebhookController
         return response()->json(['status' => 'RECEIVED']);
     }
 
-    protected function markPaid(array $data): void { /* your logic */ }
+    protected function markPaid(array $data): void
+    { /* your logic */
+    }
 
-    protected function markFailed(array $data): void { /* your logic */ }
+    protected function markFailed(array $data): void
+    { /* your logic */
+    }
 }
 
 // ===========================================================================

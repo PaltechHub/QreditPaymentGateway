@@ -15,6 +15,8 @@ final class QreditCredentials
     public function __construct(
         public readonly string $apiKey,
         public readonly string $secretKey,
+        /** Gateway-negotiated Client-Version handshake — issued per tenant by Qredit. */
+        public readonly string $clientVersion,
         public readonly bool $sandbox = true,
         public readonly string $language = 'EN',
         public readonly string $authScheme = 'HmacSHA512_O',
@@ -33,11 +35,12 @@ final class QreditCredentials
     public function toArray(): array
     {
         $array = [
-            'api_key'        => $this->apiKey,
-            'secret_key'     => $this->secretKey,
-            'sandbox'        => $this->sandbox,
-            'language'       => $this->language,
-            'auth_scheme'    => $this->authScheme,
+            'api_key' => $this->apiKey,
+            'secret_key' => $this->secretKey,
+            'client_version' => $this->clientVersion,
+            'sandbox' => $this->sandbox,
+            'language' => $this->language,
+            'auth_scheme' => $this->authScheme,
             'signature_case' => $this->signatureCase,
         ];
 

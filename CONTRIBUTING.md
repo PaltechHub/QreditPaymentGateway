@@ -1,188 +1,147 @@
-# Contributing to Qredit Laravel SDK
+# Contributing to the Qredit Laravel SDK
 
-First off, thank you for considering contributing to the Qredit Laravel SDK! It's people like you that make this package better for everyone.
+Thanks for considering a contribution. This package is actively maintained and we review PRs quickly. The guide below is short on purpose — read it end to end before opening your first PR.
 
 ## Code of Conduct
 
-By participating in this project, you are expected to uphold our Code of Conduct:
-- Be respectful and inclusive
-- Welcome newcomers and help them get started
-- Focus on what is best for the community
-- Show empathy towards other community members
+This project adheres to the [Contributor Covenant](.github/CODE_OF_CONDUCT.md). By participating, you agree to uphold it. Report unacceptable behavior to `shakerawad@paltechhub.com`.
 
-## How Can I Contribute?
+## How to contribute
 
-### Reporting Bugs
+### Reporting bugs
 
-Before creating bug reports, please check existing issues to avoid duplicates. When you create a bug report, include as many details as possible:
+Search [existing issues](https://github.com/qredit/laravel-qredit/issues) first. If you don't find one, open a [bug report](https://github.com/qredit/laravel-qredit/issues/new?template=bug_report.yml) and include:
 
-- **Use a clear and descriptive title**
-- **Describe the exact steps to reproduce the problem**
-- **Provide specific examples to demonstrate the steps**
-- **Describe the behavior you observed and what you expected**
-- **Include screenshots if relevant**
-- **Include your environment details**:
-  - PHP version
-  - Laravel version
-  - Package version
-  - Operating system
+- PHP + Laravel + package versions
+- Minimal reproducer (code snippet or failing test)
+- Full exception trace (redact credentials)
+- Which host you hit (UAT / production / VPN)
 
-### Suggesting Enhancements
+### Suggesting features
 
-Enhancement suggestions are tracked as GitHub issues. When creating an enhancement suggestion:
+Open a [feature request](https://github.com/qredit/laravel-qredit/issues/new?template=feature_request.yml) or start a [Discussion](https://github.com/qredit/laravel-qredit/discussions). For larger changes (new signing variants, new transport layers) please discuss before implementing — it saves everyone time.
 
-- **Use a clear and descriptive title**
-- **Provide a detailed description of the proposed enhancement**
-- **Explain why this enhancement would be useful**
-- **List any alternative solutions you've considered**
+### Security vulnerabilities
 
-### Pull Requests
+**Never open a public issue for security reports.** Email `shakerawad@paltechhub.com` or use [GitHub's private vulnerability reporting](https://github.com/qredit/laravel-qredit/security/advisories/new). See [SECURITY.md](SECURITY.md).
 
-1. **Fork the repository** and create your branch from `main`
-2. **Install dependencies**: `composer install`
-3. **Make your changes** following our coding standards
-4. **Add tests** for any new functionality
-5. **Update documentation** as needed
-6. **Ensure tests pass**: `composer test`
-7. **Format your code**: `composer format`
-8. **Run static analysis**: `composer analyse`
-9. **Commit your changes** using descriptive commit messages
-10. **Push to your fork** and submit a pull request
-
-## Development Setup
+## Development setup
 
 ```bash
-# Clone your fork
-git clone https://github.com/your-username/qredit-payment-gateway.git
-cd qredit-payment-gateway
-
-# Install dependencies
+git clone https://github.com/your-fork/laravel-qredit.git
+cd laravel-qredit
 composer install
-
-# Run tests
 composer test
-
-# Format code
-composer format
-
-# Run static analysis
-composer analyse
 ```
 
-## Coding Standards
+All required dev dependencies are in `composer.json` — no extra toolchain setup.
 
-We follow PSR-12 coding standards and use Laravel Pint for formatting:
+## Running the checks
 
 ```bash
-# Check code style
-vendor/bin/pint --test
-
-# Fix code style
-vendor/bin/pint
+composer test              # Pest — all unit + feature tests
+composer test-coverage     # Fails below 80% line coverage
+composer format            # Pint — autoformat + ensure PSR-12 alignment
+composer check             # format + test (what CI runs)
 ```
 
-### Key Guidelines
+Before opening a PR, `composer check` must pass locally.
 
-- **Classes**: Use PascalCase (e.g., `PaymentRequest`)
-- **Methods/Functions**: Use camelCase (e.g., `createPayment()`)
-- **Variables**: Use camelCase (e.g., `$paymentData`)
-- **Constants**: Use UPPER_SNAKE_CASE (e.g., `DEFAULT_TIMEOUT`)
-- **Files**: Match class names (e.g., `PaymentRequest.php`)
+## Writing code
 
-### Documentation
+### House rules
 
-- Add PHPDoc blocks for all classes, methods, and properties
-- Include parameter types and return types
-- Add descriptions that explain "why" not just "what"
-- Update README.md for new features
+- **PHP 8.1+.** Use constructor property promotion, enums, readonly properties where they fit.
+- **Strict types on every file.** `declare(strict_types=1);` at the top.
+- **No inline comments describing what obvious code does** — explain *why* for non-obvious constraints, otherwise omit.
+- **No new framework dependencies** without prior discussion (we pull in Saloon + Carbon — that's the ceiling).
+- **Don't touch `vendor/`.** CI rebuilds from `composer.lock` — commit the lockfile only when you change `composer.json`.
 
-Example:
-```php
-/**
- * Create a new payment request.
- *
- * This method handles the creation of payment requests including
- * validation, formatting, and API communication.
- *
- * @param array $data The payment data including amount, currency, etc.
- * @return array The response from the payment gateway
- * @throws QreditApiException If the API request fails
- */
-public function createPayment(array $data): array
-{
-    // Implementation
-}
-```
+### Signing / algorithm changes
 
-## Testing
+The HMAC algorithm is verified against live UAT and pinned by golden vectors in [`tests/Unit/HmacSignerTest.php`](tests/Unit/HmacSignerTest.php). If you change `HmacSigner`:
 
-We maintain high test coverage. Please write tests for your code:
+1. Re-verify against live UAT (the `qredit:call auth` command covers this).
+2. Regenerate golden vectors and commit them alongside the code change.
+3. Document the why in `docs/SIGNING.md` — the "why not Angular reference" footnote in that file is the pattern.
+
+### Adding a new endpoint wrapper
+
+1. Create `src/Requests/{Group}/{Name}Request.php` — extend `BaseQreditRequest`, use the `HasMessageId` trait.
+2. Add a facade method phpdoc to `src/Facades/Qredit.php`.
+3. Wire it into `src/Qredit.php` with an `@method`-friendly public method that delegates to the request class.
+4. Cover it in `tests/Feature/` using Saloon's `MockClient`.
+5. Document it in `docs/API_REFERENCE.md`.
+
+### Adding a new tenant resolver
+
+1. Create `src/Tenancy/{Name}TenantResolver.php` implementing `TenantResolver`.
+2. Add it to the list in `docs/MULTITENANCY.md` with one example.
+3. Add a unit test in `tests/Unit/TenancyTest.php`.
+
+## Writing tests
+
+- All tests are [Pest](https://pestphp.com/). Avoid mixing PHPUnit-style classes unless you're editing a legacy test file.
+- Feature tests live in `tests/Feature/`; unit tests in `tests/Unit/`.
+- Prefer Saloon `MockClient` over full HTTP mocks.
+- Golden-vector tests (like `HmacSignerTest`) should include the source of the expected value in a comment — "live UAT 2026-04-16" beats "regenerated".
 
 ```php
 // tests/Feature/YourFeatureTest.php
-public function test_your_feature_works_correctly()
-{
-    // Arrange
-    $data = ['amount' => 100];
 
-    // Act
-    $result = $this->qredit->yourMethod($data);
+it('creates a payment with amountCents', function () {
+    $mock = new MockClient([
+        CreatePaymentRequest::class => MockResponse::make(['status' => true]),
+    ]);
 
-    // Assert
-    $this->assertEquals(100, $result['amount']);
-}
+    $client = Qredit::make([...]);
+    $client->getConnector()->withMockClient($mock);
+
+    $result = $client->createPayment(['amountCents' => 100]);
+
+    expect($result['status'])->toBeTrue();
+});
 ```
 
-Run tests with:
+Run one file:
 ```bash
-# Run all tests
-composer test
-
-# Run with coverage
-composer test-coverage
-
-# Run specific test
-vendor/bin/phpunit tests/Feature/YourFeatureTest.php
+vendor/bin/pest tests/Feature/YourFeatureTest.php
 ```
 
-## Commit Messages
+## Commit messages
 
-Use clear and meaningful commit messages:
+Conventional Commits, short and specific:
 
-- **feat**: New feature (e.g., `feat: add refund functionality`)
-- **fix**: Bug fix (e.g., `fix: resolve token caching issue`)
-- **docs**: Documentation (e.g., `docs: update installation guide`)
-- **style**: Formatting (e.g., `style: fix indentation`)
-- **refactor**: Code refactoring (e.g., `refactor: simplify auth logic`)
-- **test**: Testing (e.g., `test: add payment request tests`)
-- **chore**: Maintenance (e.g., `chore: update dependencies`)
+- `feat: add calculateFees request wrapper`
+- `fix: handle null checkoutUrl in createPayment response`
+- `docs: update SIGNING.md with ccc-version header`
+- `test: pin golden vectors against live UAT`
+- `refactor: extract credential resolution into helper`
+- `chore: bump phpstan to v2`
 
-## Release Process
+One logical change per commit; squash follow-up fixes before opening your PR.
 
-1. Update version in `composer.json`
-2. Update CHANGELOG.md
-3. Create a git tag: `git tag v1.0.0`
-4. Push tags: `git push --tags`
-5. Create GitHub release
-6. Package will auto-publish to Packagist
+## Pull requests
 
-## Getting Help
+1. Fork, branch from `main` (`git checkout -b feat/my-thing`).
+2. Push commits, run `composer check` locally.
+3. Open a PR using the template. Tie it to an issue if one exists (`Closes #123`).
+4. CI must stay green on every push. If CI fails, fix it — don't rely on reviewers to flag it.
+5. Expect one round of review feedback. Address it in fixup commits; squash before merge or let the maintainer squash-merge.
 
-- **Discord**: Join our Discord server (link in README)
-- **Issues**: Open a GitHub issue
-- **Email**: dev@qredit.com
+## Release process (maintainers)
+
+1. Bump version references in `CHANGELOG.md` (add a new section; keep format).
+2. Create a tag: `git tag -a vX.Y.Z -m "Release vX.Y.Z"`.
+3. Push with tags: `git push --follow-tags`.
+4. GitHub Actions publishes the release; Packagist updates automatically.
 
 ## Recognition
 
-Contributors will be recognized in:
-- README.md contributors section
-- GitHub contributors page
-- Release notes
+Every merged PR earns a line in the changelog and the [GitHub contributors list](https://github.com/qredit/laravel-qredit/graphs/contributors). Meaningful contributions that sustain the project can be highlighted in README's Credits section — open a PR for that.
 
-## Financial Contributions
+## Financial support
 
-If you'd like to financially support the project, consider:
-- Sponsoring via GitHub Sponsors
-- Corporate sponsorship
+If you or your company depends on this SDK and want to support maintenance, see the Sponsor button on the repo (`.github/FUNDING.yml`). Corporate sponsors are listed in the README.
 
-Thank you for contributing! 🎉
+Thanks again.

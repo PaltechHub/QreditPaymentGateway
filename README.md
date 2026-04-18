@@ -1,19 +1,21 @@
 # Qredit Laravel SDK
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/qredit/laravel-qredit.svg?style=flat-square)](https://packagist.org/packages/qredit/laravel-qredit)
+[![Tests](https://img.shields.io/github/actions/workflow/status/qredit/laravel-qredit/tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/qredit/laravel-qredit/actions/workflows/tests.yml)
+[![Total Downloads](https://img.shields.io/packagist/dt/qredit/laravel-qredit.svg?style=flat-square)](https://packagist.org/packages/qredit/laravel-qredit)
 [![License](https://img.shields.io/packagist/l/qredit/laravel-qredit.svg?style=flat-square)](LICENSE.md)
 
 Production-ready Laravel SDK for the **Qredit / BlockBuilders payment gateway**. Built with multi-tenant SAAS deployments as a first-class concern.
 
 - ✅ Every Qredit API endpoint wrapped (auth, orders, payment requests, QR, fees, init, customers, transactions, clearing)
-- ✅ Automatic HMAC-SHA512 signing (merchant guide §7) — you never compute a signature yourself
+- ✅ Automatic HMAC-SHA512 signing — you never compute a signature yourself
 - ✅ Per-tenant credentials — swap API keys per-request via a pluggable `CredentialProvider`
 - ✅ Ready-made `/sign` and `/webhook` endpoints (one-line route macros)
 - ✅ Per-tenant token cache (95% fewer auth calls), transparent refresh on 401
 - ✅ `FakeQredit` test double + `qredit:call` CLI (the Postman replacement)
 - ✅ Built on [Saloon](https://docs.saloon.dev/) v3 — full middleware / mock-client support
 
-> **Status (current):** SDK is feature-complete (70 unit tests passing). Live UAT auth currently blocked on Qredit-side credential provisioning — see [docs/QREDIT_SIGNATURE_ISSUE.md](docs/QREDIT_SIGNATURE_ISSUE.md). The signer is verified correct against the merchant guide and via `openssl dgst` cross-checks; the moment Qredit issues working keys, the entire SDK + Bagisto integration goes live with no code changes.
+> **Status:** verified live against Qredit UAT — `auth/token` returns a valid JWT end-to-end through the SDK. See [CHANGELOG.md](CHANGELOG.md) for the latest release notes.
 
 ---
 
@@ -43,8 +45,8 @@ php artisan qredit:install
 The installer publishes `config/qredit.php` and prints the next-step checklist for your topology (single-tenant by default; pass `--tenancy` for multi-tenant instructions).
 
 **Requirements**
-- PHP 8.1+ — 8.3 tested, 8.4 supported
-- Laravel 10.x / 11.x / 12.x
+- PHP 8.1 / 8.2 / 8.3 / 8.4
+- Laravel 10 / 11 / 12 / 13
 - Saloon v3
 
 ---
@@ -59,7 +61,7 @@ QREDIT_SECRET_KEY=B9E0236B...
 QREDIT_SANDBOX=true
 QREDIT_SANDBOX_URL=https://apitest.qredit.tech/gw-checkout/api/v1
 QREDIT_PRODUCTION_URL=https://api.qredit.tech/gw-checkout/api/v1
-QREDIT_SIGNATURE_CASE=lower     # flip to 'upper' if the gateway rejects lowercase
+QREDIT_SIGNATURE_CASE=upper     # live UAT accepts only uppercase
 ```
 
 Register the ready-made endpoints in `routes/web.php`:
@@ -368,10 +370,10 @@ Full [`config/qredit.php`](config/qredit.php) options:
 | `sandbox_url` | `QREDIT_SANDBOX_URL` | `https://apitest.qredit.tech/gw-checkout/api/v1` | |
 | `production_url` | `QREDIT_PRODUCTION_URL` | `https://api.qredit.tech/gw-checkout/api/v1` | |
 | `language` | `QREDIT_LANGUAGE` | `EN` | `Accept-Language` header |
-| `client.type` | `QREDIT_CLIENT_TYPE` | `MP` | `Client-Type` header |
-| `client.version` | `QREDIT_CLIENT_VERSION` | `1.0.0` | `Client-Version` header |
+| `client.type` | — (hardcoded) | `TP` | `Client-Type` header — fixed; don't override |
+| `client.version` | `QREDIT_CLIENT_VERSION` | `ccc<semver>` | `Client-Version` header — derived from SDK version at runtime; set only to pin |
 | `signing.scheme` | `QREDIT_AUTH_SCHEME` | `HmacSHA512_O` | Authorization prefix |
-| `signing.case` | `QREDIT_SIGNATURE_CASE` | `lower` | Hex case (`lower` \| `upper`) |
+| `signing.case` | `QREDIT_SIGNATURE_CASE` | `upper` | Hex case — live UAT accepts only `upper` |
 | `token_storage.strategy` | `QREDIT_TOKEN_STRATEGY` | `cache` | `cache`, `database`, or `hybrid` |
 | `debug` | `QREDIT_DEBUG` | `false` | Log every request + response |
 
@@ -381,21 +383,27 @@ Full [`config/qredit.php`](config/qredit.php) options:
 
 ### `code 1004 "Bad Signature"`
 
-The gateway accepts your header format but rejects the hash. Most common causes:
-
-1. **Credentials not provisioned** — the apiKey isn't in the gateway's user database. Verify with a second host: if one host returns `1004` and another returns `1705 "User Not Found"`, the account isn't set up. Ask your Qredit contact to provision the key.
-2. **Signature case** — try flipping `QREDIT_SIGNATURE_CASE=upper`. The merchant doc itself contradicts on case (§7 step 4 says upper, step 5 says lower).
-3. **Wrong host** — `apitest.qredit.tech` (public UAT) and `185.57.122.58:2030` (VPN UAT) may have different user tables.
-
-See [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) for the full diagnostic playbook.
+Signature compared against a stored secret but mismatched. Most common causes:
+1. **Credentials not provisioned** — apiKey not in gateway's user database. Verify via a second host: if one returns `1004` and another returns `1705 "User Not Found"`, the account isn't set up.
+2. **Signature case** — live UAT rejects lowercase; leave `QREDIT_SIGNATURE_CASE=upper`.
 
 ### `code 1005 "Bad Signature"`
 
-The Authorization header is missing or the scheme prefix is wrong. Check that you send `HmacSHA512_O <hex>` (not `HMAC-SHA512` or `Bearer`).
+The Authorization header is missing or the scheme prefix is wrong. Send `HmacSHA512_O <hex>` (not `HMAC-SHA512` or `Bearer`).
+
+### `code 1012 "Bad Signature"`
+
+Usually a `Client-Type` / `Client-Version` header mismatch — the SDK hardcodes `TP` and derives the version dynamically, so this only fires if something upstream (proxy, CDN, WAF) rewrites those headers.
+
+### `code 1904 "Operation not allowed"`
+
+**Signature validated** but the apiKey lacks permission for the endpoint. Ask Qredit to grant the relevant role (e.g. `ROLE_ORDER_MANAGEMENT`).
 
 ### `QreditException: Qredit credentials missing`
 
 The default `ConfigCredentialProvider` couldn't find `QREDIT_API_KEY` / `QREDIT_SECRET_KEY` in config. Either set them in `.env`, or bind a custom `CredentialProvider` for multi-tenant use.
+
+See [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) for the full diagnostic playbook.
 
 ---
 
@@ -416,6 +424,26 @@ The default `ConfigCredentialProvider` couldn't find `QREDIT_API_KEY` / `QREDIT_
 | [`examples/WebhookHandler.php`](examples/WebhookHandler.php) | Signed-callback handler |
 
 ---
+
+## Contributing
+
+Contributions are welcome — bug fixes, new endpoint wrappers, tenant resolvers, docs, the lot. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow (fork → branch → test → pint → PR). For security issues, please don't open a public issue; follow [SECURITY.md](SECURITY.md) instead.
+
+Good first issues are labeled [`good first issue`](https://github.com/qredit/laravel-qredit/labels/good%20first%20issue) on the tracker. Questions? Open a [GitHub Discussion](https://github.com/qredit/laravel-qredit/discussions).
+
+## Community
+
+- **Bug reports / feature requests:** [GitHub Issues](https://github.com/qredit/laravel-qredit/issues)
+- **Open-ended questions, show-and-tell:** [GitHub Discussions](https://github.com/qredit/laravel-qredit/discussions)
+- **Security vulnerabilities:** email `shakerawad@paltechhub.com` — see [SECURITY.md](SECURITY.md)
+- **Changelog:** [CHANGELOG.md](CHANGELOG.md)
+- **Code of Conduct:** [CODE_OF_CONDUCT.md](.github/CODE_OF_CONDUCT.md)
+
+## Credits
+
+- Built on [Saloon](https://docs.saloon.dev/) by Sam Carré
+- HMAC signing algorithm confirmed against Qredit UAT (2026-04-16)
+- All [contributors](https://github.com/qredit/laravel-qredit/graphs/contributors)
 
 ## License
 

@@ -48,6 +48,8 @@ use Illuminate\Support\Facades\Facade;
  * @method static array listCustomers(array $filters = [])
  * @method static array listTransactions(array $filters = [])
  * @method static array changeClearingStatus(array $data)
+ * @method static array listProducts(array $query = [])
+ * @method static array listLookups(array $query = [])
  * @method static bool verifyWebhookSignature(array $payload, string $authorizationHeader)
  * @method static array processWebhook(array $payload, ?string $authorizationHeader = null)
  * @method static bool isSandbox()

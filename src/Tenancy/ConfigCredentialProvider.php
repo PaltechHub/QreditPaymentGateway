@@ -20,17 +20,20 @@ class ConfigCredentialProvider implements CredentialProvider
     {
         $apiKey = (string) config('qredit.api_key', '');
         $secretKey = (string) config('qredit.secret_key', '');
+        $clientVersion = (string) config('qredit.client.version', '');
 
         if ($apiKey === '' || $secretKey === '') {
-            throw new QreditException(
-                'Qredit credentials missing. Either set QREDIT_API_KEY and QREDIT_SECRET_KEY'
-                .' in .env, or bind a custom CredentialProvider for multi-tenant use.'
-            );
+            throw new QreditException('Qredit credentials missing. Either set QREDIT_API_KEY and QREDIT_SECRET_KEY in .env, or bind a custom CredentialProvider for multi-tenant use.');
+        }
+
+        if ($clientVersion === '') {
+            throw new QreditException('Qredit client_version missing. Set QREDIT_CLIENT_VERSION in .env, or bind a custom CredentialProvider that supplies it per tenant.');
         }
 
         return new QreditCredentials(
             apiKey: $apiKey,
             secretKey: $secretKey,
+            clientVersion: $clientVersion,
             sandbox: (bool) config('qredit.sandbox', true),
             language: (string) config('qredit.language', 'EN'),
             authScheme: (string) config('qredit.signing.scheme', 'HmacSHA512_O'),

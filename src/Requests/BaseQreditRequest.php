@@ -24,6 +24,15 @@ abstract class BaseQreditRequest extends Request
             return;
         }
 
+        // Inject X-Auth-Token from the connector into the PendingRequest headers.
+        // Saloon evaluates defaultHeaders() at connector construction — before
+        // authenticate() sets the token. So we inject it here at boot-time, which
+        // runs after the connector is fully initialized but before the request fires.
+        $authToken = $connector->getAuthToken();
+        if (is_string($authToken) && $authToken !== '') {
+            $pendingRequest->headers()->add('X-Auth-Token', $authToken);
+        }
+
         $query = $pendingRequest->query()->all() ?: [];
         $bodyArray = [];
 
@@ -38,8 +47,6 @@ abstract class BaseQreditRequest extends Request
         $msgId = $this->findMsgId($bodyArray) ?? $this->findMsgId($query);
 
         if ($msgId === null) {
-            // Signing requires msgId per merchant doc §7. Skip — the gateway will
-            // reject the unsigned request, which is the correct failure mode.
             return;
         }
 
@@ -48,7 +55,8 @@ abstract class BaseQreditRequest extends Request
             ValueFlattener::flatten($bodyArray),
         );
 
-        $authToken = $pendingRequest->headers()->get('X-Auth-Token');
+        // Include the auth token in the signed values (per merchant doc §7 —
+        // the X-Auth-Token header value participates in the HMAC).
         if (is_string($authToken) && $authToken !== '') {
             $values[] = $authToken;
         }

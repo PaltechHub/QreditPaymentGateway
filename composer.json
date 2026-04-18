@@ -13,30 +13,31 @@
     "license": "MIT",
     "authors": [
         {
-            "name": "Qredit Development Team",
-            "email": "dev@qredit.com"
+            "name": "PalTech Hub",
+            "email": "shakerawad@paltechhub.com",
+            "homepage": "https://www.paltechhub.com/"
         }
     ],
     "require": {
         "php": "^8.1|^8.2|^8.3|^8.4",
-        "illuminate/support": "^10.0|^11.0|^12.0",
-        "illuminate/contracts": "^10.0|^11.0|^12.0",
-        "illuminate/cache": "^10.0|^11.0|^12.0",
+        "illuminate/support": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/contracts": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/cache": "^10.0|^11.0|^12.0|^13.0",
         "saloonphp/saloon": "^3.0",
         "saloonphp/laravel-plugin": "^3.0",
         "nesbot/carbon": "^2.0|^3.0"
     },
     "require-dev": {
-        "orchestra/testbench": "^8.0|^9.0|^10.0",
-        "pestphp/pest": "^2.0",
-        "pestphp/pest-plugin-laravel": "^2.0",
-        "pestphp/pest-plugin-arch": "^2.0",
-        "pestphp/pest-plugin-faker": "^2.0",
-        "pestphp/pest-plugin-watch": "^2.0",
+        "orchestra/testbench": "^8.0|^9.0|^10.0|^11.0",
+        "pestphp/pest": "^2.0|^3.0",
+        "pestphp/pest-plugin-laravel": "^2.0|^3.0",
+        "pestphp/pest-plugin-arch": "^2.0|^3.0",
+        "pestphp/pest-plugin-faker": "^2.0|^3.0",
+        "pestphp/pest-plugin-watch": "^2.0|^3.0",
         "mockery/mockery": "^1.6",
         "laravel/pint": "^1.0",
-        "phpstan/phpstan": "^1.10",
-        "nunomaduro/larastan": "^2.0"
+        "phpstan/phpstan": "^1.10|^2.0",
+        "larastan/larastan": "^2.0|^3.0"
     },
     "autoload": {
         "psr-4": {

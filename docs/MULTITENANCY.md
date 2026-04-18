@@ -113,7 +113,7 @@ class BagistoChannelCredentialProvider implements CredentialProvider
             apiKey:        $apiKey,
             secretKey:     $secretKey,
             sandbox:       (bool) core()->getConfigData("sales.payment_methods.qredit.sandbox", $channelCode),
-            signatureCase: (string) (core()->getConfigData("sales.payment_methods.qredit.signature_case", $channelCode) ?: 'lower'),
+            signatureCase: 'upper',   // Live UAT accepts only uppercase — don't expose this as a per-tenant toggle.
             tenantId:      (string) $channelCode,
         );
     }

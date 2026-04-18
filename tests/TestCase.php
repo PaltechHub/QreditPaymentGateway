@@ -46,6 +46,7 @@ abstract class TestCase extends Orchestra
         // Setup default config values
         $app['config']->set('qredit.api_key', 'test-api-key');
         $app['config']->set('qredit.sandbox', true);
+        $app['config']->set('qredit.client.version', 'ccc1.0');
         $app['config']->set('qredit.webhook.secret', 'test-webhook-secret');
         $app['config']->set('qredit.cache_token', true);
         $app['config']->set('qredit.debug', false);

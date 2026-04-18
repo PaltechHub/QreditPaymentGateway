@@ -7,6 +7,7 @@ namespace Qredit\LaravelQredit\Connectors;
 use Illuminate\Support\Facades\Log;
 use Qredit\LaravelQredit\Exceptions\QreditApiException;
 use Qredit\LaravelQredit\Exceptions\QreditAuthenticationException;
+use Qredit\LaravelQredit\Exceptions\QreditException;
 use Qredit\LaravelQredit\Security\HmacSigner;
 use Saloon\Contracts\Authenticator;
 use Saloon\Exceptions\Request\FatalRequestException;
@@ -52,6 +53,14 @@ class QreditConnector extends Connector
     protected string $language;
 
     /**
+     * Gateway's `Client-Type` header. Fixed to 'TP' — other values lock the
+     * caller out of /auth/token. Not overridable by tenants.
+     */
+    protected const CLIENT_TYPE = 'TP';
+
+    protected string $clientVersion;
+
+    /**
      * Accepts either the new array options shape OR the legacy positional
      * signature ($apiKey, $sandbox) for back-compat with pre-0.2 tests.
      *
@@ -74,8 +83,20 @@ class QreditConnector extends Connector
         $this->sandboxUrl = $options['sandbox_url'] ?? config('qredit.sandbox_url');
         $this->productionUrl = $options['production_url'] ?? config('qredit.production_url');
         $this->authScheme = $options['auth_scheme'] ?? config('qredit.signing.scheme');
-        $this->signatureCase = $options['signature_case'] ?? config('qredit.signing.case', HmacSigner::CASE_LOWER);
+        $this->signatureCase = $options['signature_case'] ?? config('qredit.signing.case', HmacSigner::CASE_UPPER);
         $this->language = $options['language'] ?? config('qredit.language', 'EN');
+
+        // REQUIRED — no package-level default. Either pass it explicitly (per tenant
+        // in multi-tenant setups) or set qredit.client.version via QREDIT_CLIENT_VERSION
+        // in single-tenant deployments. The gateway issues a unique version per
+        // merchant account; a wrong/missing value locks the caller out of /auth/token.
+        $clientVersion = $options['client_version'] ?? config('qredit.client.version');
+
+        if (! \is_string($clientVersion) || $clientVersion === '') {
+            throw new QreditException('Qredit client_version is required. Pass it via Qredit::make([..., "client_version" => "..."]) per tenant, or set QREDIT_CLIENT_VERSION in .env for single-tenant deployments.');
+        }
+
+        $this->clientVersion = $clientVersion;
     }
 
     public function resolveBaseUrl(): string
@@ -94,8 +115,8 @@ class QreditConnector extends Connector
         $headers = [
             'Accept' => 'application/json',
             'Accept-Language' => $this->language,
-            'Client-Type' => config('qredit.client.type', 'MP'),
-            'Client-Version' => config('qredit.client.version', '1.0.0'),
+            'Client-Type' => self::CLIENT_TYPE,
+            'Client-Version' => $this->clientVersion,
         ];
 
         if ($this->authToken !== null) {
@@ -134,6 +155,11 @@ class QreditConnector extends Connector
     public function getApiKey(): string
     {
         return $this->apiKey;
+    }
+
+    public function getClientVersion(): string
+    {
+        return $this->clientVersion;
     }
 
     public function getSecretKey(): string

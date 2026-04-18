@@ -17,6 +17,9 @@ class QreditServiceProvider extends ServiceProvider
     {
         RouteMacros::register();
 
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'qredit');
+        $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'qredit');
+
         $this->registerPublishing();
         $this->registerCommands();
     }
@@ -55,6 +58,10 @@ class QreditServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../config/qredit.php' => config_path('qredit.php'),
         ], 'qredit-config');
+
+        $this->publishes([
+            __DIR__.'/../resources/views' => resource_path('views/vendor/qredit'),
+        ], 'qredit-views');
 
         $this->publishes([
             __DIR__.'/../database/migrations' => database_path('migrations'),

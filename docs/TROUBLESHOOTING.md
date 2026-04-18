@@ -27,19 +27,12 @@ php artisan qredit:call auth --api-key=... --secret-key=... --sandbox
 
 If one host returns `1705 User Not Found` and another returns `1004 Bad Signature`, the apiKey isn't fully provisioned. `1004` is often a masked "user not found" — no user → no secret → hash compare fails.
 
-### 2. Signature case
+### 2. Client-Type / Client-Version headers
 
-Merchant guide §7 step 4 says uppercase hex; step 5 says lowercase. The gateway may accept only one. Toggle it:
+The gateway's verify path is gated on these two headers. If they're wrong, you'll see `1012 Bad Signature` no matter how correct your hash is.
 
-```env
-QREDIT_SIGNATURE_CASE=upper   # try this if lower fails
-```
-
-Or per-call via CLI:
-
-```bash
-php artisan qredit:call auth --case=upper ...
-```
+- `Client-Type` must be `TP` — the SDK hardcodes this, don't override.
+- `Client-Version` must be the `ccc<semver>` string the SDK sends automatically (e.g. `ccc1.0`). Override via `QREDIT_CLIENT_VERSION` only if Qredit has negotiated a specific string for your integration.
 
 ### 3. Verify the signer against a known-good output
 

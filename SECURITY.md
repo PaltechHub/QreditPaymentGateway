@@ -2,13 +2,13 @@
 
 ## Supported Versions
 
-We release patches for security vulnerabilities. Currently supported versions:
+We release security patches for the latest minor release line. Earlier lines receive fixes only for critical vulnerabilities.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.x.x   | :white_check_mark: |
-| 0.9.x   | :warning: Limited  |
-| < 0.9   | :x:                |
+| 0.3.x   | :white_check_mark: |
+| 0.2.x   | :warning: Critical fixes only |
+| < 0.2   | :x:                |
 
 ## Reporting a Vulnerability
 
@@ -20,7 +20,7 @@ We take the security of the Qredit Laravel SDK seriously. If you have discovered
 
 Instead, please report security vulnerabilities by emailing:
 
-📧 **security@qredit.com**
+📧 **shakerawad@paltechhub.com**
 
 Or use GitHub's private vulnerability reporting:
 

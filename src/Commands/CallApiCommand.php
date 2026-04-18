@@ -32,11 +32,12 @@ class CallApiCommand extends Command
                             {method? : Endpoint method — see --list for the full set}
                             {--api-key= : Public API key (falls back to QREDIT_API_KEY)}
                             {--secret-key= : Secret API key for signing (falls back to QREDIT_SECRET_KEY)}
+                            {--client-version= : Client-Version handshake string issued by Qredit (falls back to QREDIT_CLIENT_VERSION)}
                             {--sandbox : Force sandbox environment (default)}
                             {--production : Force production environment}
                             {--language=EN : Accept-Language header value}
                             {--scheme= : Authorization scheme prefix, defaults to config("qredit.signing.scheme")}
-                            {--case=lower : Hex case for signature — lower|upper}
+                            {--case=upper : Hex case for signature — upper (live UAT default) | lower}
                             {--payload= : Inline JSON payload}
                             {--payload-file= : Read JSON payload from a file}
                             {--id= : Resource reference for get/update/delete calls}
@@ -77,6 +78,8 @@ class CallApiCommand extends Command
         'init-payment' => ['service' => 'initPayment', 'kind' => 'body'],
         'list-transactions' => ['service' => 'listTransactions', 'kind' => 'query'],
         'change-clearing-status' => ['service' => 'changeClearingStatus', 'kind' => 'body'],
+        'list-products' => ['service' => 'listProducts', 'kind' => 'query'],
+        'list-lookups' => ['service' => 'listLookups', 'kind' => 'query'],
     ];
 
     public function handle(): int
@@ -142,10 +145,11 @@ class CallApiCommand extends Command
         return [
             'api_key' => $this->option('api-key') ?? config('qredit.api_key'),
             'secret_key' => $this->option('secret-key') ?? config('qredit.secret_key'),
+            'client_version' => $this->option('client-version') ?? config('qredit.client.version'),
             'sandbox' => $sandbox,
             'language' => $this->option('language') ?? config('qredit.language', 'EN'),
             'auth_scheme' => $this->option('scheme') ?: config('qredit.signing.scheme'),
-            'signature_case' => $this->option('case') ?? config('qredit.signing.case', 'lower'),
+            'signature_case' => $this->option('case') ?? config('qredit.signing.case', 'upper'),
         ];
     }
 

@@ -487,8 +487,8 @@ These are attached by `QreditConnector::defaultHeaders()` + `BaseQreditRequest::
 | `Accept: application/json` | always |
 | `Content-Type: application/json` | for POST / PUT / PATCH / DELETE |
 | `Accept-Language: EN` or `AR` | config or per-tenant language |
-| `Client-Type: MP` | `config('qredit.client.type')` |
-| `Client-Version: 1.0.0` | `config('qredit.client.version')` |
+| `Client-Type: TP` | hardcoded in the connector — other values lock you out of `/auth/token` |
+| `Client-Version: ccc<semver>` | derived at runtime from the SDK's composer version; override via `QREDIT_CLIENT_VERSION` only if Qredit has negotiated a specific string |
 | `X-Auth-Token: <jwt>` | after first successful auth |
 | `Authorization: HmacSHA512_O <hex>` | computed per-request |
 

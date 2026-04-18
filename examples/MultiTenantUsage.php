@@ -46,7 +46,7 @@ class DbCredentialProvider implements CredentialProvider
             secretKey: decrypt($tenant->qredit_secret_key),
             sandbox: (bool) $tenant->qredit_sandbox,
             language: $tenant->language_code ?? 'EN',
-            signatureCase: $tenant->qredit_signature_case ?? 'lower',
+            signatureCase: $tenant->qredit_signature_case ?? 'upper',
             tenantId: (string) $tenantId,
         );
     }

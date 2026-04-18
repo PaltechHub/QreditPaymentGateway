@@ -15,7 +15,6 @@ use Qredit\LaravelQredit\Requests\Orders\CreateOrderRequest;
 use Qredit\LaravelQredit\Requests\Orders\GetOrderRequest;
 use Qredit\LaravelQredit\Requests\Orders\ListOrdersRequest;
 use Qredit\LaravelQredit\Requests\Orders\UpdateOrderRequest;
-use Qredit\LaravelQredit\Requests\Payments\ChangeClearingStatusRequest;
 use Qredit\LaravelQredit\Requests\PaymentRequests\CalculateFeesRequest;
 use Qredit\LaravelQredit\Requests\PaymentRequests\CancelPaymentRequest;
 use Qredit\LaravelQredit\Requests\PaymentRequests\CreatePaymentRequest;
@@ -24,6 +23,7 @@ use Qredit\LaravelQredit\Requests\PaymentRequests\GetPaymentRequest;
 use Qredit\LaravelQredit\Requests\PaymentRequests\InitPaymentRequest;
 use Qredit\LaravelQredit\Requests\PaymentRequests\ListPaymentRequestsRequest;
 use Qredit\LaravelQredit\Requests\PaymentRequests\UpdatePaymentRequest;
+use Qredit\LaravelQredit\Requests\Payments\ChangeClearingStatusRequest;
 use Qredit\LaravelQredit\Requests\Transactions\ListTransactionsRequest;
 use Qredit\LaravelQredit\Security\HmacSigner;
 use Saloon\Http\Response;
@@ -58,7 +58,7 @@ class Qredit
 
     /**
      * @param  array<string, mixed>|string|null  $options  Either an options array (preferred),
-     *                                                    or an api-key string for backward compatibility.
+     *                                                     or an api-key string for backward compatibility.
      */
     public function __construct(array|string|null $options = null, ?bool $sandbox = null, bool $skipAuth = false)
     {
@@ -284,6 +284,28 @@ class Qredit
     public function changeClearingStatus(array $data): array
     {
         return $this->sendWithRetry(new ChangeClearingStatusRequest($data))->json();
+    }
+
+    // ----- Lookups (gw-lookup service) --------------------------------------
+
+    /**
+     * List products by category type.
+     *
+     * Common types: PAYMENT_CHANNEL (payment methods), DELIVERY (shipping providers).
+     */
+    public function listProducts(array $query = []): array
+    {
+        return $this->sendWithRetry(new Requests\Lookup\ProductListRequest($query))->json();
+    }
+
+    /**
+     * List lookup values by type.
+     *
+     * Common types: MERCHANT_CATEGORY, CITY, AREA.
+     */
+    public function listLookups(array $query = []): array
+    {
+        return $this->sendWithRetry(new Requests\Lookup\ListLookupsRequest($query))->json();
     }
 
     // ----- Webhook / callback signing ---------------------------------------

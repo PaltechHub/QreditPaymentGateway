@@ -37,9 +37,9 @@ final class HmacSigner
      * Compute the signature hex for a request.
      *
      * @param  string  $secretKey  The base64-encoded merchant secret as issued by Qredit.
-     * @param  string  $msgId      The request msgId; also used as the nonce.
+     * @param  string  $msgId  The request msgId; also used as the nonce.
      * @param  array<mixed>  $values  Scalar values (body + query + X-Auth-Token) to sign.
-     * @param  string  $case       'upper' (reference default) or 'lower'.
+     * @param  string  $case  'upper' (reference default) or 'lower'.
      */
     public static function sign(string $secretKey, string $msgId, array $values, string $case = self::CASE_UPPER): string
     {
@@ -60,42 +60,17 @@ final class HmacSigner
     }
 
     /**
-     * Derive the 16-byte HMAC key from (secret, msgId) using the exact algorithm
-     * the Angular reference implementation uses. Exposed for tests + debugging.
+     * Derive the 16-byte HMAC key from (secret, msgId).
+     *
+     * Confirmed against live UAT (auth/token returned a JWT with roles). The
+     * gateway's TP-client path uses a straight raw MD5 of the UTF-8 bytes of
+     * (secretKey . msgId) — no base64 decode, no UTF-16 / Latin1 truncation.
+     * The Angular reference we previously mirrored applies to a different
+     * client variant the widget ships with.
      */
     public static function deriveKey(string $secretKey, string $msgId): string
     {
-        // Step 1 — base64 decode the secret.
-        $decodedBinary = (string) base64_decode($secretKey, false);
-
-        // Step 2 — run it through UTF-8 TextDecoder semantics. Invalid sequences
-        // become U+FFFD. PHP's default mb_convert_encoding substitutes 0x3F ('?');
-        // force U+FFFD so we match the Angular behaviour exactly.
-        $previous = mb_substitute_character();
-        mb_substitute_character(0xFFFD);
-        $decodedString = mb_convert_encoding($decodedBinary, 'UTF-8', 'UTF-8');
-        mb_substitute_character(is_int($previous) ? $previous : 0xFFFD);
-
-        if ($decodedString === false) {
-            $decodedString = '';
-        }
-
-        // Step 3 — append the msgId.
-        $apiSecretKey = $decodedString.$msgId;
-
-        // Step 4 — for each JS char (UTF-16 code unit), take the low byte only.
-        // PHP has no native UTF-16 char iterator; convert to UTF-16LE and read
-        // two bytes at a time. For each 16-bit code unit we keep the LOW byte,
-        // which is exactly what `String.fromCharCode(cu) -> Latin1.parse` does
-        // in CryptoJS.
-        $utf16le = (string) mb_convert_encoding($apiSecretKey, 'UTF-16LE', 'UTF-8');
-        $byteString = '';
-        for ($i = 0, $len = strlen($utf16le); $i < $len; $i += 2) {
-            $byteString .= $utf16le[$i];
-        }
-
-        // Step 5 — MD5 raw (16 bytes) = the HMAC key.
-        return md5($byteString, true);
+        return md5($secretKey.$msgId, true);
     }
 
     /**

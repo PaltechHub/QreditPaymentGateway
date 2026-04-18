@@ -2,7 +2,6 @@
 
 use Illuminate\Http\Request;
 use Qredit\LaravelQredit\Contracts\CredentialProvider;
-use Qredit\LaravelQredit\Contracts\TenantResolver;
 use Qredit\LaravelQredit\Exceptions\QreditException;
 use Qredit\LaravelQredit\Qredit;
 use Qredit\LaravelQredit\QreditManager;
@@ -17,7 +16,7 @@ use Qredit\LaravelQredit\Testing\FakeQredit;
 describe('QreditCredentials value object', function () {
     it('produces the array shape the connector expects', function () {
         $creds = new QreditCredentials(
-            apiKey: 'k', secretKey: 's', sandbox: true, language: 'EN',
+            apiKey: 'k', secretKey: 's', clientVersion: 'ccc1.0', sandbox: true, language: 'EN',
             authScheme: 'HmacSHA512_O', signatureCase: 'lower',
             tenantId: 'shop-a',
         );
@@ -25,6 +24,7 @@ describe('QreditCredentials value object', function () {
         expect($creds->toArray())->toBe([
             'api_key' => 'k',
             'secret_key' => 's',
+            'client_version' => 'ccc1.0',
             'sandbox' => true,
             'language' => 'EN',
             'auth_scheme' => 'HmacSHA512_O',
@@ -33,27 +33,27 @@ describe('QreditCredentials value object', function () {
     });
 
     it('uses tenantId as the cache key when set', function () {
-        $creds = new QreditCredentials(apiKey: 'k', secretKey: 's', tenantId: 'shop-a');
+        $creds = new QreditCredentials(apiKey: 'k', secretKey: 's', clientVersion: 'ccc1.0', tenantId: 'shop-a');
 
         expect($creds->cacheKey())->toBe('shop-a');
     });
 
     it('falls back to sha1(apiKey) when no tenantId', function () {
-        $creds = new QreditCredentials(apiKey: 'k', secretKey: 's');
+        $creds = new QreditCredentials(apiKey: 'k', secretKey: 's', clientVersion: 'ccc1.0');
 
         expect($creds->cacheKey())->toBe(sha1('k'));
     });
 
     it('includes url overrides only when they are provided', function () {
         $withUrls = new QreditCredentials(
-            apiKey: 'k', secretKey: 's',
+            apiKey: 'k', secretKey: 's', clientVersion: 'ccc1.0',
             sandboxUrl: 'https://alt.example.com',
             productionUrl: 'https://prod.example.com',
         );
 
         expect($withUrls->toArray())->toHaveKeys(['sandbox_url', 'production_url']);
 
-        $withoutUrls = new QreditCredentials(apiKey: 'k', secretKey: 's');
+        $withoutUrls = new QreditCredentials(apiKey: 'k', secretKey: 's', clientVersion: 'ccc1.0');
 
         expect($withoutUrls->toArray())
             ->not->toHaveKey('sandbox_url')
@@ -63,23 +63,31 @@ describe('QreditCredentials value object', function () {
 
 describe('ConfigCredentialProvider', function () {
     it('throws when config is missing api_key', function () {
-        config(['qredit.api_key' => '', 'qredit.secret_key' => 'x']);
+        config(['qredit.api_key' => '', 'qredit.secret_key' => 'x', 'qredit.client.version' => 'ccc1.0']);
 
         expect(fn () => (new ConfigCredentialProvider)->credentialsFor())
             ->toThrow(QreditException::class, 'credentials missing');
     });
 
     it('throws when config is missing secret_key', function () {
-        config(['qredit.api_key' => 'x', 'qredit.secret_key' => '']);
+        config(['qredit.api_key' => 'x', 'qredit.secret_key' => '', 'qredit.client.version' => 'ccc1.0']);
 
         expect(fn () => (new ConfigCredentialProvider)->credentialsFor())
             ->toThrow(QreditException::class, 'credentials missing');
+    });
+
+    it('throws when config is missing client_version', function () {
+        config(['qredit.api_key' => 'x', 'qredit.secret_key' => 'y', 'qredit.client.version' => '']);
+
+        expect(fn () => (new ConfigCredentialProvider)->credentialsFor())
+            ->toThrow(QreditException::class, 'client_version missing');
     });
 
     it('returns QreditCredentials built from config', function () {
         config([
             'qredit.api_key' => 'api-key',
             'qredit.secret_key' => 'secret-key',
+            'qredit.client.version' => 'ccc1.0',
             'qredit.sandbox' => false,
             'qredit.language' => 'AR',
             'qredit.signing.scheme' => 'HmacSHA512_O',
@@ -91,6 +99,7 @@ describe('ConfigCredentialProvider', function () {
         expect($creds)->toBeInstanceOf(QreditCredentials::class)
             ->and($creds->apiKey)->toBe('api-key')
             ->and($creds->secretKey)->toBe('secret-key')
+            ->and($creds->clientVersion)->toBe('ccc1.0')
             ->and($creds->sandbox)->toBeFalse()
             ->and($creds->language)->toBe('AR')
             ->and($creds->signatureCase)->toBe('upper')
@@ -138,8 +147,12 @@ describe('SubdomainTenantResolver', function () {
     it('prefers the {tenant} route param in webhook context', function () {
         $resolver = new SubdomainTenantResolver('example.com');
         $request = Request::create('https://shared.example.com/qredit/webhook/shop-b');
-        $request->setRouteResolver(fn () => new class {
-            public function parameter($name) { return $name === 'tenant' ? 'shop-b' : null; }
+        $request->setRouteResolver(fn () => new class
+        {
+            public function parameter($name)
+            {
+                return $name === 'tenant' ? 'shop-b' : null;
+            }
         });
 
         // Laravel Request::route() returns the route; we read parameter('tenant').
@@ -202,13 +215,21 @@ describe('CallbackTenantResolver', function () {
 
 describe('QreditManager', function () {
     it('caches clients per tenant id', function () {
-        $provider = new class implements CredentialProvider {
+        $provider = new class implements CredentialProvider
+        {
             public int $calls = 0;
-            public function credentialsFor(?string $tenantId = null): QreditCredentials {
+
+            public function credentialsFor(?string $tenantId = null): QreditCredentials
+            {
                 $this->calls++;
-                return new QreditCredentials(apiKey: "k-{$tenantId}", secretKey: 's', tenantId: $tenantId);
+
+                return new QreditCredentials(apiKey: "k-{$tenantId}", secretKey: 's', clientVersion: 'ccc1.0', tenantId: $tenantId);
             }
-            public function isConfiguredFor(?string $tenantId = null): bool { return true; }
+
+            public function isConfiguredFor(?string $tenantId = null): bool
+            {
+                return true;
+            }
         };
 
         $manager = new QreditManager($provider, new NullTenantResolver);
@@ -225,11 +246,17 @@ describe('QreditManager', function () {
     });
 
     it('forTenant(null) uses the __default__ slot', function () {
-        $provider = new class implements CredentialProvider {
-            public function credentialsFor(?string $tenantId = null): QreditCredentials {
-                return new QreditCredentials(apiKey: 'k', secretKey: 's', tenantId: $tenantId);
+        $provider = new class implements CredentialProvider
+        {
+            public function credentialsFor(?string $tenantId = null): QreditCredentials
+            {
+                return new QreditCredentials(apiKey: 'k', secretKey: 's', clientVersion: 'ccc1.0', tenantId: $tenantId);
             }
-            public function isConfiguredFor(?string $tenantId = null): bool { return true; }
+
+            public function isConfiguredFor(?string $tenantId = null): bool
+            {
+                return true;
+            }
         };
 
         $manager = new QreditManager($provider, new NullTenantResolver);
@@ -241,11 +268,17 @@ describe('QreditManager', function () {
     });
 
     it('fake() returns the provided instance without building a real client', function () {
-        $provider = new class implements CredentialProvider {
-            public function credentialsFor(?string $tenantId = null): QreditCredentials {
+        $provider = new class implements CredentialProvider
+        {
+            public function credentialsFor(?string $tenantId = null): QreditCredentials
+            {
                 throw new \LogicException('should not be called');
             }
-            public function isConfiguredFor(?string $tenantId = null): bool { return true; }
+
+            public function isConfiguredFor(?string $tenantId = null): bool
+            {
+                return true;
+            }
         };
 
         $manager = new QreditManager($provider, new NullTenantResolver);
@@ -260,11 +293,17 @@ describe('QreditManager', function () {
     });
 
     it('per-tenant fakes route calls correctly', function () {
-        $provider = new class implements CredentialProvider {
-            public function credentialsFor(?string $tenantId = null): QreditCredentials {
+        $provider = new class implements CredentialProvider
+        {
+            public function credentialsFor(?string $tenantId = null): QreditCredentials
+            {
                 throw new \LogicException('should not be called');
             }
-            public function isConfiguredFor(?string $tenantId = null): bool { return true; }
+
+            public function isConfiguredFor(?string $tenantId = null): bool
+            {
+                return true;
+            }
         };
 
         $manager = new QreditManager($provider, new NullTenantResolver);
@@ -279,13 +318,21 @@ describe('QreditManager', function () {
     });
 
     it('flush() empties the client cache', function () {
-        $provider = new class implements CredentialProvider {
+        $provider = new class implements CredentialProvider
+        {
             public int $calls = 0;
-            public function credentialsFor(?string $tenantId = null): QreditCredentials {
+
+            public function credentialsFor(?string $tenantId = null): QreditCredentials
+            {
                 $this->calls++;
-                return new QreditCredentials(apiKey: 'k', secretKey: 's');
+
+                return new QreditCredentials(apiKey: 'k', secretKey: 's', clientVersion: 'ccc1.0');
             }
-            public function isConfiguredFor(?string $tenantId = null): bool { return true; }
+
+            public function isConfiguredFor(?string $tenantId = null): bool
+            {
+                return true;
+            }
         };
 
         $manager = new QreditManager($provider, new NullTenantResolver);
