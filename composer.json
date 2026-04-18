@@ -9,7 +9,11 @@
         "saloon",
         "payment-gateway"
     ],
-    "homepage": "https://github.com/qredit/laravel-qredit",
+    "homepage": "https://github.com/PaltechHub/QreditPaymentGateway",
+    "support": {
+        "issues": "https://github.com/PaltechHub/QreditPaymentGateway/issues",
+        "source": "https://github.com/PaltechHub/QreditPaymentGateway"
+    },
     "license": "MIT",
     "authors": [
         {
