@@ -10,7 +10,7 @@ This project adheres to the [Contributor Covenant](.github/CODE_OF_CONDUCT.md). 
 
 ### Reporting bugs
 
-Search [existing issues](https://github.com/qredit/laravel-qredit/issues) first. If you don't find one, open a [bug report](https://github.com/qredit/laravel-qredit/issues/new?template=bug_report.yml) and include:
+Search [existing issues](https://github.com/PaltechHub/QreditPaymentGateway/issues) first. If you don't find one, open a [bug report](https://github.com/PaltechHub/QreditPaymentGateway/issues/new?template=bug_report.yml) and include:
 
 - PHP + Laravel + package versions
 - Minimal reproducer (code snippet or failing test)
@@ -19,11 +19,11 @@ Search [existing issues](https://github.com/qredit/laravel-qredit/issues) first.
 
 ### Suggesting features
 
-Open a [feature request](https://github.com/qredit/laravel-qredit/issues/new?template=feature_request.yml) or start a [Discussion](https://github.com/qredit/laravel-qredit/discussions). For larger changes (new signing variants, new transport layers) please discuss before implementing — it saves everyone time.
+Open a [feature request](https://github.com/PaltechHub/QreditPaymentGateway/issues/new?template=feature_request.yml) or start a [Discussion](https://github.com/PaltechHub/QreditPaymentGateway/discussions). For larger changes (new signing variants, new transport layers) please discuss before implementing — it saves everyone time.
 
 ### Security vulnerabilities
 
-**Never open a public issue for security reports.** Email `shakerawad@paltechhub.com` or use [GitHub's private vulnerability reporting](https://github.com/qredit/laravel-qredit/security/advisories/new). See [SECURITY.md](SECURITY.md).
+**Never open a public issue for security reports.** Email `shakerawad@paltechhub.com` or use [GitHub's private vulnerability reporting](https://github.com/PaltechHub/QreditPaymentGateway/security/advisories/new). See [SECURITY.md](SECURITY.md).
 
 ## Development setup
 
@@ -138,7 +138,7 @@ One logical change per commit; squash follow-up fixes before opening your PR.
 
 ## Recognition
 
-Every merged PR earns a line in the changelog and the [GitHub contributors list](https://github.com/qredit/laravel-qredit/graphs/contributors). Meaningful contributions that sustain the project can be highlighted in README's Credits section — open a PR for that.
+Every merged PR earns a line in the changelog and the [GitHub contributors list](https://github.com/PaltechHub/QreditPaymentGateway/graphs/contributors). Meaningful contributions that sustain the project can be highlighted in README's Credits section — open a PR for that.
 
 ## Financial support
 

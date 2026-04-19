@@ -1,5 +1,5 @@
 {
-    "name": "qredit/laravel-qredit",
+    "name": "qredit-payment-gateway/laravel-qredit",
     "description": "Laravel integration for Qredit payment gateway using Saloon PHP",
     "keywords": [
         "laravel",
