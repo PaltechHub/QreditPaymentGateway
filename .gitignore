@@ -1,0 +1,63 @@
+# Composer
+/vendor/
+composer.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Testing
+.phpunit.result.cache
+.phpunit.cache/
+phpunit.xml
+coverage/
+.coverage
+*.log
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Laravel
+bootstrap/cache/*
+storage/*.key
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# PHPStan
+.phpstan/
+
+# Pint
+.php-cs-fixer.cache
+.pint.cache
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Temporary files
+*.tmp
+*.temp
+/tmp/
+/temp/

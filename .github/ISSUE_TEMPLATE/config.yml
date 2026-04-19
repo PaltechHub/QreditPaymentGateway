@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/qredit/laravel-qredit/security/advisories/new
+    about: Report a security issue privately through GitHub Security Advisories
+  - name: Questions and discussion
+    url: https://github.com/qredit/laravel-qredit/discussions
+    about: Ask how to use the SDK or share an integration pattern
+  - name: Qredit gateway account / credentials
+    url: https://www.paltechhub.com/
+    about: Issues with your Qredit account or credentials aren't SDK bugs — contact Qredit directly
