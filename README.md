@@ -1,9 +1,9 @@
 # Qredit Laravel SDK
 
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/qredit/laravel-qredit.svg?style=flat-square)](https://packagist.org/packages/qredit/laravel-qredit)
-[![Tests](https://img.shields.io/github/actions/workflow/status/qredit/laravel-qredit/tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/qredit/laravel-qredit/actions/workflows/tests.yml)
-[![Total Downloads](https://img.shields.io/packagist/dt/qredit/laravel-qredit.svg?style=flat-square)](https://packagist.org/packages/qredit/laravel-qredit)
-[![License](https://img.shields.io/packagist/l/qredit/laravel-qredit.svg?style=flat-square)](LICENSE.md)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/qredit-payment-gateway/laravel-qredit.svg?style=flat-square)](https://packagist.org/packages/qredit-payment-gateway/laravel-qredit)
+[![Tests](https://img.shields.io/github/actions/workflow/status/qredit-payment-gateway/laravel-qredit/tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/PaltechHub/QreditPaymentGateway/actions/workflows/tests.yml)
+[![Total Downloads](https://img.shields.io/packagist/dt/qredit-payment-gateway/laravel-qredit.svg?style=flat-square)](https://packagist.org/packages/qredit-payment-gateway/laravel-qredit)
+[![License](https://img.shields.io/packagist/l/qredit-payment-gateway/laravel-qredit.svg?style=flat-square)](LICENSE.md)
 
 Production-ready Laravel SDK for the **Qredit / BlockBuilders payment gateway**. Built with multi-tenant SAAS deployments as a first-class concern.
 
@@ -38,7 +38,7 @@ Production-ready Laravel SDK for the **Qredit / BlockBuilders payment gateway**.
 ## Installation
 
 ```bash
-composer require qredit/laravel-qredit
+composer require qredit-payment-gateway/laravel-qredit
 php artisan qredit:install
 ```
 
@@ -429,12 +429,12 @@ See [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) for the full diagnostic
 
 Contributions are welcome — bug fixes, new endpoint wrappers, tenant resolvers, docs, the lot. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow (fork → branch → test → pint → PR). For security issues, please don't open a public issue; follow [SECURITY.md](SECURITY.md) instead.
 
-Good first issues are labeled [`good first issue`](https://github.com/qredit/laravel-qredit/labels/good%20first%20issue) on the tracker. Questions? Open a [GitHub Discussion](https://github.com/qredit/laravel-qredit/discussions).
+Good first issues are labeled [`good first issue`](https://github.com/PaltechHub/QreditPaymentGateway/labels/good%20first%20issue) on the tracker. Questions? Open a [GitHub Discussion](https://github.com/PaltechHub/QreditPaymentGateway/discussions).
 
 ## Community
 
-- **Bug reports / feature requests:** [GitHub Issues](https://github.com/qredit/laravel-qredit/issues)
-- **Open-ended questions, show-and-tell:** [GitHub Discussions](https://github.com/qredit/laravel-qredit/discussions)
+- **Bug reports / feature requests:** [GitHub Issues](https://github.com/PaltechHub/QreditPaymentGateway/issues)
+- **Open-ended questions, show-and-tell:** [GitHub Discussions](https://github.com/PaltechHub/QreditPaymentGateway/discussions)
 - **Security vulnerabilities:** email `shakerawad@paltechhub.com` — see [SECURITY.md](SECURITY.md)
 - **Changelog:** [CHANGELOG.md](CHANGELOG.md)
 - **Code of Conduct:** [CODE_OF_CONDUCT.md](.github/CODE_OF_CONDUCT.md)
@@ -443,7 +443,7 @@ Good first issues are labeled [`good first issue`](https://github.com/qredit/lar
 
 - Built on [Saloon](https://docs.saloon.dev/) by Sam Carré
 - HMAC signing algorithm confirmed against Qredit UAT (2026-04-16)
-- All [contributors](https://github.com/qredit/laravel-qredit/graphs/contributors)
+- All [contributors](https://github.com/PaltechHub/QreditPaymentGateway/graphs/contributors)
 
 ## License
 

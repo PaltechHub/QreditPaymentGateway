@@ -4,7 +4,7 @@
 
 Instead:
 
-1. Use [GitHub Security Advisories](https://github.com/qredit/laravel-qredit/security/advisories/new) to report privately, or
+1. Use [GitHub Security Advisories](https://github.com/PaltechHub/QreditPaymentGateway/security/advisories/new) to report privately, or
 2. Email `shakerawad@paltechhub.com`.
 
 See [SECURITY.md](../SECURITY.md) for our disclosure policy.
