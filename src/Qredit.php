@@ -333,7 +333,15 @@ class Qredit
 
         $providedSignature = substr($authorizationHeader, strlen($expectedPrefix));
 
-        $msgId = $payload['msgId'] ?? null;
+        // Nonce resolution for callbacks. The production webhook envelope the gateway
+        // emits is a records-wrapper shaped like the List API response:
+        //   { status, code, message, reference, totalCount, offset, records: [ {...} ] }
+        // It carries a top-level `reference` but no `msgId`. We fall back to that, then
+        // to the first record's `reference`, so signature verification still works.
+        $msgId = $payload['msgId']
+            ?? ($payload['reference'] ?? null)
+            ?? ($payload['records'][0]['reference'] ?? null);
+
         if (! is_string($msgId) || $msgId === '') {
             $log->warning('Qredit webhook: missing or invalid msgId in payload', [
                 'payload_keys' => array_keys($payload),
@@ -384,12 +392,31 @@ class Qredit
             }
         }
 
+        $data = $payload['records'][0] ?? $payload['data'] ?? $payload;
+
         return [
-            'event' => $payload['event'] ?? $payload['type'] ?? 'transaction',
-            'data' => $payload['records'][0] ?? $payload['data'] ?? $payload,
+            'event' => $payload['event'] ?? $payload['type'] ?? $this->deriveEventFromData($data),
+            'data' => $data,
             'raw' => $payload,
             'processed_at' => now()->toIso8601String(),
         ];
+    }
+
+    /**
+     * Map the gateway's `transactionStatus` onto one of the event names our
+     * dispatcher understands. The production webhook envelope does not carry an
+     * `event` field, so we derive it from the transaction record itself.
+     */
+    protected function deriveEventFromData(array $data): string
+    {
+        $status = strtoupper((string) ($data['transactionStatus'] ?? ''));
+
+        return match ($status) {
+            'SUCCESS', 'APPROVED', 'COMPLETED', 'PAID' => 'payment.completed',
+            'FAILED', 'DECLINED', 'REJECTED', 'ERROR' => 'payment.failed',
+            'CANCELLED', 'CANCELED', 'VOIDED' => 'order.cancelled',
+            default => 'transaction',
+        };
     }
 
     public function isSandbox(): bool
