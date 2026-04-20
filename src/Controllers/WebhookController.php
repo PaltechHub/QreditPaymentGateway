@@ -34,6 +34,22 @@ class WebhookController extends Controller
 
     public function handle(Request $request): JsonResponse
     {
+        Log::warning('Qredit webhook: INBOUND (raw, pre-verification)', [
+            'ip' => $request->ip(),
+            'method' => $request->method(),
+            'url' => $request->fullUrl(),
+            'route_params' => $request->route()?->parameters() ?? [],
+            'authorization' => $request->header('Authorization'),
+            'content_type' => $request->header('Content-Type'),
+            'user_agent' => $request->header('User-Agent'),
+            'headers' => collect($request->headers->all())
+                ->except(['cookie', 'authorization'])
+                ->map(static fn ($v) => is_array($v) && count($v) === 1 ? $v[0] : $v)
+                ->toArray(),
+            'raw_body' => $request->getContent(),
+            'payload' => $request->all(),
+        ]);
+
         $tenantId = $this->manager->tenants()->tenantIdFromWebhook($request);
         $payload = $request->all();
 
