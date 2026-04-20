@@ -320,7 +320,14 @@ class Qredit
         $scheme = $this->connector->getAuthScheme();
         $expectedPrefix = $scheme.' ';
 
+        $log = \Illuminate\Support\Facades\Log::channel(config('qredit.logging.channel', 'stack'));
+
         if (! str_starts_with($authorizationHeader, $expectedPrefix)) {
+            $log->warning('Qredit webhook: Authorization scheme mismatch', [
+                'expected_prefix' => $expectedPrefix,
+                'received_header' => $authorizationHeader,
+            ]);
+
             return false;
         }
 
@@ -328,6 +335,11 @@ class Qredit
 
         $msgId = $payload['msgId'] ?? null;
         if (! is_string($msgId) || $msgId === '') {
+            $log->warning('Qredit webhook: missing or invalid msgId in payload', [
+                'payload_keys' => array_keys($payload),
+                'msgId' => $msgId,
+            ]);
+
             return false;
         }
 
@@ -336,8 +348,28 @@ class Qredit
         $expectedLower = HmacSigner::sign($this->connector->getSecretKey(), $msgId, $values, HmacSigner::CASE_LOWER);
         $expectedUpper = strtoupper($expectedLower);
 
-        return hash_equals($expectedLower, $providedSignature)
+        $matches = hash_equals($expectedLower, $providedSignature)
             || hash_equals($expectedUpper, $providedSignature);
+
+        if (! $matches) {
+            $secret = $this->connector->getSecretKey();
+
+            $log->warning('Qredit webhook: signature mismatch', [
+                'scheme' => $scheme,
+                'msgId' => $msgId,
+                'provided_signature' => $providedSignature,
+                'expected_upper' => $expectedUpper,
+                'expected_lower' => $expectedLower,
+                'values_count' => count($values),
+                'values_preview' => array_slice(array_map(static fn ($v) => is_scalar($v) ? (string) $v : gettype($v), $values), 0, 30),
+                'signed_message_preview' => substr(\Qredit\LaravelQredit\Security\HmacSigner::buildMessage($values), 0, 500),
+                'secret_key_length' => strlen($secret),
+                'secret_key_fingerprint' => substr(md5($secret), 0, 8),
+                'payload' => $payload,
+            ]);
+        }
+
+        return $matches;
     }
 
     /**
