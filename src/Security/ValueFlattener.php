@@ -30,6 +30,35 @@ final class ValueFlattener
         return $out;
     }
 
+    /**
+     * Flatten only top-level scalars — skip any key whose value is an array. This
+     * mirrors what the inbound webhook signer on the gateway side does for its
+     * records envelope: nested sub-objects (paymentRequest, sender, receiver,
+     * senderAccount, receiverAccount, extraDetails, trackingInfo, ...) are not
+     * part of the signed set, only the flat scalar fields of the record itself.
+     *
+     * @param  array<mixed>  $data
+     * @return array<int, scalar>
+     */
+    public static function flattenTopLevel(array $data): array
+    {
+        $out = [];
+
+        foreach ($data as $value) {
+            if (is_array($value) || $value === null) {
+                continue;
+            }
+
+            if (is_string($value) && $value === '') {
+                continue;
+            }
+
+            $out[] = $value;
+        }
+
+        return $out;
+    }
+
     private static function walk(array $data, array &$out): void
     {
         foreach ($data as $value) {
