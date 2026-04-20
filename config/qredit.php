@@ -212,7 +212,7 @@ return [
     | this enabled in production for security.
     |
     */
-    'verify_webhook_signature' => env('QREDIT_VERIFY_WEBHOOK_SIGNATURE', true),
+    'verify_webhook_signature' => env('QREDIT_VERIFY_WEBHOOK_SIGNATURE', false),
 
     /*
     |--------------------------------------------------------------------------

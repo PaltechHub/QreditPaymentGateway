@@ -351,28 +351,49 @@ class Qredit
             return false;
         }
 
-        $values = \Qredit\LaravelQredit\Security\ValueFlattener::flatten($payload);
+        // Qredit's inbound webhook signer only sees top-level scalar fields of the
+        // record; the outbound (request-signing) variant walks the full tree. We
+        // accept a match against either so the same helper covers both callers
+        // without regressing outbound-verified replay scenarios.
+        $valuesTopLevel = \Qredit\LaravelQredit\Security\ValueFlattener::flattenTopLevel($payload);
+        $valuesFull = \Qredit\LaravelQredit\Security\ValueFlattener::flatten($payload);
 
-        $expectedLower = HmacSigner::sign($this->connector->getSecretKey(), $msgId, $values, HmacSigner::CASE_LOWER);
-        $expectedUpper = strtoupper($expectedLower);
+        $secretKey = $this->connector->getSecretKey();
 
-        $matches = hash_equals($expectedLower, $providedSignature)
-            || hash_equals($expectedUpper, $providedSignature);
+        $expectedTopLevelLower = HmacSigner::sign($secretKey, $msgId, $valuesTopLevel, HmacSigner::CASE_LOWER);
+        $expectedFullLower = HmacSigner::sign($secretKey, $msgId, $valuesFull, HmacSigner::CASE_LOWER);
+
+        $candidates = [
+            $expectedTopLevelLower,
+            strtoupper($expectedTopLevelLower),
+            $expectedFullLower,
+            strtoupper($expectedFullLower),
+        ];
+
+        $matches = false;
+        foreach ($candidates as $candidate) {
+            if (hash_equals($candidate, $providedSignature)) {
+                $matches = true;
+                break;
+            }
+        }
 
         if (! $matches) {
-            $secret = $this->connector->getSecretKey();
-
             $log->warning('Qredit webhook: signature mismatch', [
                 'scheme' => $scheme,
                 'msgId' => $msgId,
                 'provided_signature' => $providedSignature,
-                'expected_upper' => $expectedUpper,
-                'expected_lower' => $expectedLower,
-                'values_count' => count($values),
-                'values_preview' => array_slice(array_map(static fn ($v) => is_scalar($v) ? (string) $v : gettype($v), $values), 0, 30),
-                'signed_message_preview' => substr(\Qredit\LaravelQredit\Security\HmacSigner::buildMessage($values), 0, 500),
-                'secret_key_length' => strlen($secret),
-                'secret_key_fingerprint' => substr(md5($secret), 0, 8),
+                'expected_top_level_upper' => strtoupper($expectedTopLevelLower),
+                'expected_top_level_lower' => $expectedTopLevelLower,
+                'expected_full_upper' => strtoupper($expectedFullLower),
+                'expected_full_lower' => $expectedFullLower,
+                'top_level_values_count' => count($valuesTopLevel),
+                'top_level_values_preview' => array_slice(array_map(static fn ($v) => is_scalar($v) ? (string) $v : gettype($v), $valuesTopLevel), 0, 30),
+                'top_level_signed_message' => \Qredit\LaravelQredit\Security\HmacSigner::buildMessage($valuesTopLevel),
+                'full_values_count' => count($valuesFull),
+                'full_signed_message_preview' => substr(\Qredit\LaravelQredit\Security\HmacSigner::buildMessage($valuesFull), 0, 500),
+                'secret_key_length' => strlen($secretKey),
+                'secret_key_fingerprint' => substr(md5($secretKey), 0, 8),
                 'payload' => $payload,
             ]);
         }
