@@ -266,45 +266,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Payment Channels Configuration
-    |--------------------------------------------------------------------------
-    |
-    | Configure which payment channels are enabled for your integration.
-    | Available channels: qr, card, wallet
-    |
-    */
-    'payment_channels' => [
-        'qr' => env('QREDIT_PAYMENT_CHANNEL_QR', true),
-        'card' => env('QREDIT_PAYMENT_CHANNEL_CARD', false),
-        'wallet' => env('QREDIT_PAYMENT_CHANNEL_WALLET', false),
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Shipping Provider Codes
-    |--------------------------------------------------------------------------
-    |
-    | Map your shipping provider names to Qredit shipping codes.
-    |
-    */
-    'shipping_providers' => [
-        'standard' => 'standard',
-        'express' => 'express',
-        'optimus' => 'optimus',
-        'aramex' => 'aramex',
-        'dhl' => 'dhl',
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
     | Order Configuration
     |--------------------------------------------------------------------------
     |
-    | Configure order-related settings.
+    | Defaults applied when generating outbound payment requests:
+    |
+    | - lock_when_paid: Sent as `lockOrderWhenPaid` on createPayment. When true,
+    |   the gateway refuses additional payment attempts once any payment settles
+    |   against the order. Safe default `true` — a single order shouldn't be
+    |   charged twice. Override via QREDIT_LOCK_ORDER_WHEN_PAID=false for flows
+    |   that intentionally split an order across multiple payments.
+    |
+    | - payment_expiration_minutes: Lifetime in minutes for hosted-checkout
+    |   links (createPayment `expiration` field). Qredit's portal 404s once the
+    |   window closes. 30 days (43200) is the default — generous enough for
+    |   asynchronous bill-pay flows, short enough that regenerating supersedes
+    |   stale links.
     |
     */
     'order' => [
-        'lock_when_paid' => env('QREDIT_LOCK_ORDER_WHEN_PAID', false),
-        'payment_expiration_minutes' => env('QREDIT_PAYMENT_EXPIRATION_MINUTES', 1440), // 24 hours
+        'lock_when_paid' => (bool) env('QREDIT_LOCK_ORDER_WHEN_PAID', true),
+        'payment_expiration_minutes' => (int) env('QREDIT_PAYMENT_EXPIRATION_MINUTES', 43200),
     ],
 ];
