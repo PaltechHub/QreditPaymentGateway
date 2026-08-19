@@ -1,0 +1,16 @@
+includes:
+    - ./vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 6
+
+    paths:
+        - src
+
+    excludePaths:
+        - src/Testing/FakeQredit.php
+
+    ignoreErrors:
+        - '#Call to an undefined method Saloon\\Http\\Response::#'
+
+    reportUnmatchedIgnoredErrors: false
