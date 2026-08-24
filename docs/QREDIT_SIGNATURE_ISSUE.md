@@ -76,12 +76,14 @@ SDK no longer targets.
 
 ```bash
 php artisan qredit:call auth \
-  --api-key=EdVfej9DvSSHBCtn0DDUviHxmXMj3t0bodQqjeNXF0 \
-  --secret-key=B9E0236B77E5C16B1F3540265920C7E0C541622E66C4F76FBC53BC990F11E496 \
+  --api-key=<your UAT api key> \
+  --secret-key=<your UAT secret> \
   --sandbox
 ```
 
 Expected: JSON with `access_token` (JWT) and `status: true`.
+
+Qredit issues these per merchant account — keep them in `.env`, never in the repo.
 
 Signer source: [src/Security/HmacSigner.php](../src/Security/HmacSigner.php).
 Connector headers: [src/Connectors/QreditConnector.php](../src/Connectors/QreditConnector.php).
