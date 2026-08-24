@@ -120,12 +120,12 @@ class FakeQredit extends Qredit
     { return $this->record('listTransactions', [$filters], $this->defaultEnvelope()); }
 
     // Webhook
-    public function verifyWebhookSignature(array $payload, string $authorizationHeader): bool
-    { return $this->record('verifyWebhookSignature', [$payload, $authorizationHeader], true); }
+    public function verifyWebhookSignature(array $payload, string $authorizationHeader, ?string $rawBody = null): bool
+    { return $this->record('verifyWebhookSignature', [$payload, $authorizationHeader, $rawBody], true); }
 
-    public function processWebhook(array $payload, ?string $authorizationHeader = null): array
+    public function processWebhook(array $payload, ?string $authorizationHeader = null, ?string $rawBody = null): array
     {
-        return $this->record('processWebhook', [$payload, $authorizationHeader], [
+        return $this->record('processWebhook', [$payload, $authorizationHeader, $rawBody], [
             'event' => 'transaction',
             'data' => $payload['records'][0] ?? $payload,
             'raw' => $payload,

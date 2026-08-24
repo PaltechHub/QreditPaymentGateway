@@ -296,8 +296,12 @@ class Qredit
      * Verify the signature on an inbound webhook payload. Per merchant doc the same
      * HMAC SHA512 scheme that signs outgoing requests also validates callbacks; the
      * gateway uses this connector's secretKey + the payload's own msgId.
+     *
+     * Always pass $rawBody when you have it (`$request->getContent()`). The gateway
+     * signs the JSON number literals it emitted, and json_decode destroys them —
+     * `10.0` becomes float(10), which stringifies to `"10"` and never matches.
      */
-    public function verifyWebhookSignature(array $payload, string $authorizationHeader): bool
+    public function verifyWebhookSignature(array $payload, string $authorizationHeader, ?string $rawBody = null): bool
     {
         $scheme = $this->connector->getAuthScheme();
         $expectedPrefix = $scheme.' ';
@@ -340,17 +344,29 @@ class Qredit
         $valuesTopLevel = \Qredit\LaravelQredit\Security\ValueFlattener::flattenTopLevel($payload);
         $valuesFull = \Qredit\LaravelQredit\Security\ValueFlattener::flatten($payload);
 
+        // The authoritative one: the gateway signs the number literals it put on the
+        // wire (`10.0`, `1.0`), which json_decode has already flattened to `10` / `1`
+        // by the time $payload reaches us. Flattening the raw body preserves them.
+        $valuesRaw = $rawBody !== null && $rawBody !== ''
+            ? \Qredit\LaravelQredit\Security\ValueFlattener::flattenRawJson($rawBody)
+            : null;
+
         $secretKey = $this->connector->getSecretKey();
 
         $expectedTopLevelLower = HmacSigner::sign($secretKey, $msgId, $valuesTopLevel, HmacSigner::CASE_LOWER);
         $expectedFullLower = HmacSigner::sign($secretKey, $msgId, $valuesFull, HmacSigner::CASE_LOWER);
+        $expectedRawLower = $valuesRaw !== null
+            ? HmacSigner::sign($secretKey, $msgId, $valuesRaw, HmacSigner::CASE_LOWER)
+            : null;
 
-        $candidates = [
+        $candidates = array_filter([
+            $expectedRawLower,
+            $expectedRawLower !== null ? strtoupper($expectedRawLower) : null,
             $expectedTopLevelLower,
             strtoupper($expectedTopLevelLower),
             $expectedFullLower,
             strtoupper($expectedFullLower),
-        ];
+        ]);
 
         $matches = false;
         foreach ($candidates as $candidate) {
@@ -364,6 +380,15 @@ class Qredit
             $log->warning('Qredit webhook: signature mismatch', [
                 'scheme' => $scheme,
                 'msgId' => $msgId,
+            ]);
+        }
+
+        // Full diagnostic dump — signatures, signed messages and the payload itself.
+        // Behind the debug flag: it contains customer PII and key fingerprints.
+        if (! $matches && config('qredit.debug', false)) {
+            $log->debug('Qredit webhook: signature mismatch (diagnostics)', [
+                'scheme' => $scheme,
+                'msgId' => $msgId,
                 'provided_signature' => $providedSignature,
                 'expected_top_level_upper' => strtoupper($expectedTopLevelLower),
                 'expected_top_level_lower' => $expectedTopLevelLower,
@@ -372,6 +397,9 @@ class Qredit
                 'top_level_values_count' => count($valuesTopLevel),
                 'top_level_values_preview' => array_slice(array_map(static fn ($v) => is_scalar($v) ? (string) $v : gettype($v), $valuesTopLevel), 0, 30),
                 'top_level_signed_message' => \Qredit\LaravelQredit\Security\HmacSigner::buildMessage($valuesTopLevel),
+                'expected_raw_body_upper' => $expectedRawLower !== null ? strtoupper($expectedRawLower) : null,
+                'expected_raw_body_lower' => $expectedRawLower,
+                'raw_body_values_count' => $valuesRaw !== null ? count($valuesRaw) : null,
                 'full_values_count' => count($valuesFull),
                 'full_signed_message_preview' => substr(\Qredit\LaravelQredit\Security\HmacSigner::buildMessage($valuesFull), 0, 500),
                 'secret_key_length' => strlen($secretKey),
@@ -387,10 +415,10 @@ class Qredit
      * Process a webhook payload — verify (if signature provided) and return a
      * normalized envelope for the caller to dispatch.
      */
-    public function processWebhook(array $payload, ?string $authorizationHeader = null): array
+    public function processWebhook(array $payload, ?string $authorizationHeader = null, ?string $rawBody = null): array
     {
         if ($authorizationHeader !== null && config('qredit.verify_webhook_signature', true)) {
-            if (! $this->verifyWebhookSignature($payload, $authorizationHeader)) {
+            if (! $this->verifyWebhookSignature($payload, $authorizationHeader, $rawBody)) {
                 throw new QreditException('Invalid webhook signature');
             }
         }
