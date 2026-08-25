@@ -50,16 +50,12 @@ describe('HmacSigner — message assembly', function () {
 describe('HmacSigner — key derivation', function () {
 
     it('takes the raw MD5 of (secret . msgId) as the 16-byte HMAC key', function () {
-        // Confirmed against live UAT (auth/token returned a JWT):
-        //   secret = 'B9E0236B77E5C16B1F3540265920C7E0C541622E66C4F76FBC53BC990F11E496'
-        //   msgId  = 'probe-abc123'
-        //   keyHex = '06bcaf6c7d423bec7df7b0e32abac714'
         $key = HmacSigner::deriveKey(
-            'B9E0236B77E5C16B1F3540265920C7E0C541622E66C4F76FBC53BC990F11E496',
+            '00112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF',
             'probe-abc123',
         );
 
-        expect(bin2hex($key))->toBe('06bcaf6c7d423bec7df7b0e32abac714')
+        expect(bin2hex($key))->toBe('22db7631764348194a266cad9c6fefe2')
             ->and(strlen($key))->toBe(16);
     });
 
@@ -74,7 +70,7 @@ describe('HmacSigner — key derivation', function () {
 describe('HmacSigner — signature output', function () {
 
     it('produces a deterministic 128-char uppercase hex string by default', function () {
-        $secret = 'B9E0236B77E5C16B1F3540265920C7E0C541622E66C4F76FBC53BC990F11E496';
+        $secret = '00112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF';
         $msgId = '01062571545OiZoS';
 
         $signature = HmacSigner::sign($secret, $msgId, ['10', 'ILS']);
@@ -85,33 +81,33 @@ describe('HmacSigner — signature output', function () {
             ->toMatch('/^[A-F0-9]{128}$/');
     });
 
-    it('matches the live-UAT output for (secret, msgId=probe-abc123, apiKey)', function () {
+    it('pins the (secret, msgId=probe-abc123, apiKey) vector', function () {
         $sig = HmacSigner::sign(
-            'B9E0236B77E5C16B1F3540265920C7E0C541622E66C4F76FBC53BC990F11E496',
+            '00112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF',
             'probe-abc123',
-            ['probe-abc123', 'EdVfej9DvSSHBCtn0DDUviHxmXMj3t0bodQqjeNXF0'],
+            ['probe-abc123', 'ExampleApiKeyNotARealCredential0000000000'],
         );
 
         expect($sig)->toBe(
-            'BDDCA9E14E3BF18F413853BA1A03C2B077977D937AD700A639C3D60E85B50856'
-            .'3F045529287F8927069477DB8D94F1A1C9142C9A480AC953ABE0BF3E52965A7D'
+            'C79588BDDBE758B53B8439B641A955B29345859219E83C79AE15D3AAF6FA2BC5'
+            .'34BC6F2C8DD5179DFDA61D0D68D934C2ACE62F6BC5F623B08AD40B8B6697D8F9'
         );
     });
 
-    it('matches the live-UAT output for (secret=CF63..., msgId=01062571545OiZoS)', function () {
+    it('pins the (secret, msgId=01062571545OiZoS) vector', function () {
         $sig = HmacSigner::sign(
-            'CF63DBB1ADCEEBD3451985746B7D619998CB8E8AAC00715660D0CC911484B335',
+            'FFEEDDCCBBAA99887766554433221100FFEEDDCCBBAA99887766554433221100',
             '01062571545OiZoS',
             ['10', 'ILS', 'NDI=', 'test', 'false', '123456789', 'MjIx', '01062571545OiZoS'],
         );
 
         expect($sig)->toBe(
-            '1C6122C3F47B02C363193091A9C6EE2A2EF54272233E026211016F954F046D36'
-            .'1C4A7080679BE5E6BDCC7C3A5D245FEEC48CCCEB14472F4FFB0C4E373CDF05F5'
+            '134009182D7CC53349A223ACAFE559683B2197E8B1E8E319AF2BB27679D6ADE4'
+            .'0997A194A2C0EC5CA08B80C9114ED3C67376682093B616901E78BE5948535F9F'
         );
     });
 
-    it('matches the live-UAT output for a simple base64 secret', function () {
+    it('pins the vector for a simple base64 secret', function () {
         $sig = HmacSigner::sign(
             'QWxhZGRpbjpvcGVuIHNlc2FtZQ==',
             'hello',

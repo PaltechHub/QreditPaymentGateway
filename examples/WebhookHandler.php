@@ -138,9 +138,12 @@ class CustomWebhookController
     {
         $tenantId = $request->route('tenant');
 
+        // Always pass the raw body — the gateway signs the JSON number literals
+        // it emitted, and json_decode destroys them (10.0 -> "10").
         $valid = Qredit::forTenant($tenantId)->verifyWebhookSignature(
             $request->all(),
             $request->header('Authorization'),
+            $request->getContent(),
         );
 
         if (! $valid) {

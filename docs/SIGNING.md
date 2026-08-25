@@ -75,12 +75,14 @@ Authorization: HmacSHA512_O <signature>
 
 ## Golden vectors
 
-Every vector below was produced by the SDK's signer against the live UAT algorithm and is pinned as a unit test in [tests/Unit/HmacSignerTest.php](../tests/Unit/HmacSignerTest.php).
+Every vector below is pinned as a unit test in [tests/Unit/HmacSignerTest.php](../tests/Unit/HmacSignerTest.php).
+
+The secrets and API keys shown here are **placeholders**, not credentials. Qredit issues a unique secret per merchant account; keep yours in `.env` and never commit it.
 
 | secret | msgId | values | Signature (upper hex) |
 |---|---|---|---|
-| `B9E0236B77E5C16B1F3540265920C7E0C541622E66C4F76FBC53BC990F11E496` | `probe-abc123` | `[msgId, apiKey]` | `BDDCA9E14E3BF18F…52965A7D` |
-| `CF63DBB1ADCEEBD3451985746B7D619998CB8E8AAC00715660D0CC911484B335` | `01062571545OiZoS` | `["10","ILS","NDI=","test","false","123456789","MjIx",msgId]` | `1C6122C3F47B02C3…3CDF05F5` |
+| `00112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF` | `probe-abc123` | `[msgId, apiKey]` | `C79588BDDBE758B5…6697D8F9` |
+| `FFEEDDCCBBAA99887766554433221100FFEEDDCCBBAA99887766554433221100` | `01062571545OiZoS` | `["10","ILS","NDI=","test","false","123456789","MjIx",msgId]` | `134009182D7CC533…48535F9F` |
 | `QWxhZGRpbjpvcGVuIHNlc2FtZQ==` | `hello` | `["hello","world","42","true"]` | `11C4175C3B5CBB40…0930F2CA` |
 | `AAAA` | `x` | `["a","b","c"]` | `790802F88384D07C…A525C04D` |
 | `MjAwMA==` | `1` | `["x"]` | `88815672776EA54C…AC72DC5E` |

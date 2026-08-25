@@ -59,6 +59,81 @@ final class ValueFlattener
         return $out;
     }
 
+    /**
+     * Flatten straight from the raw JSON body, preserving each number exactly as it
+     * appears on the wire.
+     *
+     * The gateway (Java) signs over the literal it emitted — `10.0`, `1.0`, `100.00`.
+     * PHP's json_decode turns those into floats, and `(string) 10.0` is `"10"`, which
+     * silently breaks every inbound signature. Quoting the numeric literals before
+     * decoding keeps them as strings all the way into the signed message.
+     *
+     * @return array<int, scalar>|null null when $json is not a JSON object/array.
+     */
+    public static function flattenRawJson(string $json): ?array
+    {
+        $decoded = json_decode(self::quoteNumericLiterals($json), true);
+
+        return is_array($decoded) ? self::flatten($decoded) : null;
+    }
+
+    /**
+     * Wrap every bare JSON number literal in quotes.
+     *
+     * Outside a string, `-` or a digit can only begin a number in valid JSON, so a
+     * single pass that tracks in-string state (and backslash escapes) is enough.
+     * Booleans and nulls are left alone.
+     */
+    public static function quoteNumericLiterals(string $json): string
+    {
+        $out = '';
+        $length = strlen($json);
+        $inString = false;
+        $escaped = false;
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $json[$i];
+
+            if ($inString) {
+                $out .= $char;
+
+                if ($escaped) {
+                    $escaped = false;
+                } elseif ($char === '\\') {
+                    $escaped = true;
+                } elseif ($char === '"') {
+                    $inString = false;
+                }
+
+                continue;
+            }
+
+            if ($char === '"') {
+                $inString = true;
+                $out .= $char;
+
+                continue;
+            }
+
+            if ($char === '-' || ($char >= '0' && $char <= '9')) {
+                $end = $i;
+
+                while ($end < $length && strpos('-+.eE0123456789', $json[$end]) !== false) {
+                    $end++;
+                }
+
+                $out .= '"'.substr($json, $i, $end - $i).'"';
+                $i = $end - 1;
+
+                continue;
+            }
+
+            $out .= $char;
+        }
+
+        return $out;
+    }
+
     private static function walk(array $data, array &$out): void
     {
         foreach ($data as $value) {

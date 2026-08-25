@@ -136,6 +136,8 @@ For payloads without an `event` field (Qredit's default callback shape per merch
 
 The SDK verifies both lowercase and uppercase hex signatures (since the gateway's case handling isn't 100% documented). Both comparisons use `hash_equals` to prevent timing attacks.
 
+Verification is computed over the **raw request body**, not the decoded array. The gateway signs the JSON number literals it emitted — `"amount":10.0` is signed as `"10.0"` — and `json_decode` collapses that to `float(10)`, which stringifies to `"10"`. So if you call `verifyWebhookSignature()` yourself, always pass `$request->getContent()` as the third argument; the bundled `WebhookController` already does.
+
 If verification fails, the controller returns `400 { "status": "rejected", "message": "Invalid webhook signature" }` and logs the event with `tenant_id`. Qredit will retry; your server won't act on an unverified payload.
 
 To disable signature verification (NOT recommended — dev/local only):

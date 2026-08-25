@@ -52,8 +52,8 @@ echo 'Token (first 20 chars): '.substr($token, 0, 20)."...\n";
  *   skip_auth       (bool)      true → don't auto-authenticate on construct.
  */
 $client = Qredit::make([
-    'api_key' => 'EdVfej9DvSSHBCtn0DDUviHxmXMj3t0bodQqjeNXF0',
-    'secret_key' => 'B9E0236B77E5C16B1F3540265920C7E0C541622E66C4F76FBC53BC990F11E496',
+    'api_key' => 'ExampleApiKeyNotARealCredential0000000000',
+    'secret_key' => '00112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF',
     'sandbox' => true,
     'language' => 'EN',
     'signature_case' => 'upper',
