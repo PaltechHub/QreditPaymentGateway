@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CVE-2026-33942 (insecure deserialization, high), CVE-2026-33182 (SSRF /
   credential leakage via absolute endpoint URLs) and CVE-2026-33183 (fixture
   path traversal). Composer 2.9+ refuses to install them by default.
+- **Unsigned webhooks are rejected.** With `verify_webhook_signature` on, a
+  request without an `Authorization` header used to skip verification
+  entirely, so anyone could post a fake payment event.
 
 ### Changed
 

@@ -126,6 +126,17 @@ describe('Qredit — webhook verification', function () {
         expect(fn () => $q->processWebhook(['msgId' => 'h1'], 'HmacSHA512_O bad'))
             ->toThrow(QreditException::class, 'Invalid webhook signature');
     });
+
+    it('processWebhook rejects unsigned payloads when verification is enabled', function () {
+        config(['qredit.verify_webhook_signature' => true]);
+
+        $q = Qredit::make(['api_key' => 'k', 'secret_key' => 's', 'skip_auth' => true]);
+
+        expect(fn () => $q->processWebhook(['msgId' => 'h1', 'event' => 'payment.completed']))
+            ->toThrow(QreditException::class, 'Invalid webhook signature')
+            ->and(fn () => $q->processWebhook(['msgId' => 'h1'], ''))
+            ->toThrow(QreditException::class, 'Invalid webhook signature');
+    });
 });
 
 describe('Qredit — URLs + exceptions', function () {

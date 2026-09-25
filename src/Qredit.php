@@ -417,8 +417,10 @@ class Qredit
      */
     public function processWebhook(array $payload, ?string $authorizationHeader = null, ?string $rawBody = null): array
     {
-        if ($authorizationHeader !== null && config('qredit.verify_webhook_signature', true)) {
-            if (! $this->verifyWebhookSignature($payload, $authorizationHeader, $rawBody)) {
+        if (config('qredit.verify_webhook_signature', true)) {
+            // An unsigned request must not bypass verification.
+            if ($authorizationHeader === null || $authorizationHeader === ''
+                || ! $this->verifyWebhookSignature($payload, $authorizationHeader, $rawBody)) {
                 throw new QreditException('Invalid webhook signature');
             }
         }
