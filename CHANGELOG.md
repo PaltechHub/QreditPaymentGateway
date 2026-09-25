@@ -5,6 +5,23 @@ All notable changes to `qredit-laravel` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- **Upgraded to Saloon v4.** Every Saloon v3 release is affected by
+  CVE-2026-33942 (insecure deserialization, high), CVE-2026-33182 (SSRF /
+  credential leakage via absolute endpoint URLs) and CVE-2026-33183 (fixture
+  path traversal). Composer 2.9+ refuses to install them by default.
+
+### Changed
+
+- **Laravel 9.52+ supported.** `illuminate/*` constraints widened to
+  `^9.52|^10.0|^11.0|^12.0|^13.0`.
+- **PHP 8.2 minimum** (required by Saloon v4).
+- **Dropped `saloonphp/laravel-plugin`.** The SDK never used it; it only
+  pinned the host app to newer Laravel versions.
+
 ## [0.3.0] - 2026-04-16
 
 Algorithm correction — confirmed against live UAT (auth/token returned a JWT).

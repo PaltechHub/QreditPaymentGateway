@@ -13,7 +13,7 @@ Production-ready Laravel SDK for the **Qredit / BlockBuilders payment gateway**.
 - ✅ Ready-made `/sign` and `/webhook` endpoints (one-line route macros)
 - ✅ Per-tenant token cache (95% fewer auth calls), transparent refresh on 401
 - ✅ `FakeQredit` test double + `qredit:call` CLI (the Postman replacement)
-- ✅ Built on [Saloon](https://docs.saloon.dev/) v3 — full middleware / mock-client support
+- ✅ Built on [Saloon](https://docs.saloon.dev/) v4 — full middleware / mock-client support
 
 > **Status:** verified live against Qredit UAT — `auth/token` returns a valid JWT end-to-end through the SDK. See [CHANGELOG.md](CHANGELOG.md) for the latest release notes.
 
@@ -45,9 +45,9 @@ php artisan qredit:install
 The installer publishes `config/qredit.php` and prints the next-step checklist for your topology (single-tenant by default; pass `--tenancy` for multi-tenant instructions).
 
 **Requirements**
-- PHP 8.1 / 8.2 / 8.3 / 8.4
-- Laravel 10 / 11 / 12 / 13
-- Saloon v3
+- PHP 8.2 / 8.3 / 8.4
+- Laravel 9.52+ / 10 / 11 / 12 / 13
+- Saloon v4
 
 ---
 
