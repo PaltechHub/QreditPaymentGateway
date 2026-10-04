@@ -227,9 +227,14 @@ See [`docs/MULTITENANCY.md`](docs/MULTITENANCY.md) for deep-dive examples includ
 | Payment req. | `updatePayment($ref, $data)` | `PUT /paymentRequests` |
 | Payment req. | `deletePayment($ref, $reason)` | `DELETE /paymentRequests` |
 | Payment req. | `listPayments($query)` | `GET /paymentRequests` |
-| Payment req. | `generateQR($query)` | `GET /paymentRequests/generateQR` |
+| Payment req. | `generateQR($ref, $productCode, $expiry, $media)` | `GET /paymentRequests/generateQR` |
+| Payment req. | `calculateFees($ref, $productCode)` | `POST /paymentRequests/calculateFees` |
 | Customers | `listCustomers($filters)` | `GET /customers` |
 | Transactions | `listTransactions($filters)` | `GET /payments` |
+| Transactions | `changeClearingStatus($encodedId, $status, $reason)` | `POST /payments/changeClearingStatus` |
+| Reports | `reconciliationReport($query)` | `GET /reports/reconciliation` |
+| Corporate limits | `listCorporateLimitPeriods($query)` | `GET /admin/corporateLimitPeriods` |
+| Corporate limits | `syncCorporateBranchLimit($corporateId, $operation)` | `POST /admin/admin/corporateBranchLimit` |
 | Webhook | `verifyWebhookSignature($p, $a)` | — |
 | Webhook | `processWebhook($p, $a)` | — |
 

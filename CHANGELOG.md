@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **New endpoints:** `calculateFees()` (`POST /paymentRequests/calculateFees`),
+  `changeClearingStatus()` (`POST /payments/changeClearingStatus`),
+  `reconciliationReport()` (`GET /reports/reconciliation`),
+  `listCorporateLimitPeriods()` (`GET /admin/corporateLimitPeriods`) and
+  `syncCorporateBranchLimit()` (`POST /admin/admin/corporateBranchLimit`,
+  sent with `Client-Type: SYS`). `changeClearingStatus()` is sent with
+  `Client-Type: BP`, as the gateway documents. Each one is also on the facade,
+  `FakeQredit` and `qredit:call`.
+
 ### Security
 
 - **Upgraded to Saloon v4.** Every Saloon v3 release is affected by
