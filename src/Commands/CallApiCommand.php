@@ -42,6 +42,7 @@ class CallApiCommand extends Command
                             {--payload-file= : Read JSON payload from a file}
                             {--id= : Resource reference for get/update/delete calls}
                             {--reason= : Reason string for cancel calls}
+                            {--operation= : CREATE or DELETE for sync-corporate-branch-limit}
                             {--dry-run : Sign + print the request but do not send it}
                             {--list : List supported methods and exit}
                             ';
@@ -58,6 +59,9 @@ class CallApiCommand extends Command
      *   'id'          → --id is the first arg, payload is optional second.
      *   'id+payload'  → --id first, payload second.
      *   'id+reason'   → --id first, --reason second.
+     *   'id+operation'→ --id first, --operation second.
+     *   'named'       → payload keys are the method's parameter names,
+     *                   e.g. {"paymentRequestReference":"…","productCode":"NC-QR"}.
      *   'none'        → no args.
      */
     protected const METHODS = [
@@ -74,7 +78,12 @@ class CallApiCommand extends Command
         'update-payment' => ['service' => 'updatePayment', 'kind' => 'id+payload'],
         'cancel-payment' => ['service' => 'deletePayment', 'kind' => 'id+reason'],
         'generate-qr' => ['service' => 'generateQR', 'kind' => 'query'],
+        'calculate-fees' => ['service' => 'calculateFees', 'kind' => 'named'],
         'list-transactions' => ['service' => 'listTransactions', 'kind' => 'query'],
+        'change-clearing-status' => ['service' => 'changeClearingStatus', 'kind' => 'named'],
+        'reconciliation-report' => ['service' => 'reconciliationReport', 'kind' => 'query'],
+        'list-corporate-limit-periods' => ['service' => 'listCorporateLimitPeriods', 'kind' => 'query'],
+        'sync-corporate-branch-limit' => ['service' => 'syncCorporateBranchLimit', 'kind' => 'id+operation'],
         'list-products' => ['service' => 'listProducts', 'kind' => 'query'],
         'list-lookups' => ['service' => 'listLookups', 'kind' => 'query'],
     ];
@@ -293,8 +302,19 @@ class CallApiCommand extends Command
             'id' => $qredit->{$service}($this->requireId($id)),
             'id+payload' => $qredit->{$service}($this->requireId($id), $payload),
             'id+reason' => $qredit->{$service}($this->requireId($id), $reason),
+            'named' => $qredit->{$service}(...$payload),
+            'id+operation' => $qredit->{$service}($this->requireId($id), $this->requireOperation($this->option('operation'))),
             'none' => $qredit->{$service}(),
         };
+    }
+
+    protected function requireOperation(?string $operation): string
+    {
+        if (! $operation) {
+            throw new \RuntimeException('--operation is required for this method (CREATE or DELETE).');
+        }
+
+        return $operation;
     }
 
     protected function requireId(?string $id): string

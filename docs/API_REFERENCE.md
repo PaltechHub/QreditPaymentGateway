@@ -265,20 +265,37 @@ Qredit::listPayments([
 
 ---
 
-### `generateQR(array $query): array`
+### `generateQR(string|array $reference, ?string $productCode = null, ?int $expiryTimeLimit = null, ?string $merchantChannelMedia = null): array`
 
 ```php
-$qr = Qredit::generateQR([
-    'reference'            => '66573792',
-    'productCode'          => 'NC-QR',
-    'expiryTimeLimit'      => 1440,
-    'merchantChannelMedia' => 'SCREEN_ELECTRONIC_WEBSITE',
-]);
+$qr = Qredit::generateQR(
+    reference: '66573792',
+    productCode: 'NC-QR',
+    expiryTimeLimit: 1440,                            // minutes, gateway default 1440
+    merchantChannelMedia: 'SCREEN_ELECTRONIC_WEBSITE', // PRINT_BILL_INVOICE | SCREEN_ELECTRONIC_MERCHANT_POS_POI | SCREEN_ELECTRONIC_WEBSITE | SCREEN_ELECTRONIC_APP | SCREEN_ELECTRONIC_OTHER
+);
+
+// The array form still works:
+$qr = Qredit::generateQR(['reference' => '66573792', 'productCode' => 'NC-QR']);
 ```
+
+An unknown `merchantChannelMedia` throws `InvalidArgumentException`.
 
 **Gateway endpoint:** `GET /paymentRequests/generateQR`
 
 Returns the QR image payload (base64 or URL, depending on account config).
+
+---
+
+### `calculateFees(string $paymentRequestReference, string $productCode): array`
+
+```php
+Qredit::calculateFees('66573792', 'CSAB');
+```
+
+**Gateway endpoint:** `POST /paymentRequests/calculateFees`
+
+Calculates the fees a payment request incurs on a payment channel. Body: `{ msgId, reference, productCode }`.
 
 ---
 
@@ -337,6 +354,82 @@ Each record carries:
   "receiver":          { "latinName": "Merchant", ... }
 }
 ```
+
+---
+
+### `changeClearingStatus(string $encodedId, string $clearingStatus, string $statusReason, ?string $username = null): array`
+
+```php
+Qredit::changeClearingStatus(
+    encodedId: 'transaction-encoded-id',
+    clearingStatus: 'ON_HOLD',          // NOT_CLEARED | CLEARED | ON_HOLD
+    statusReason: 'Customer dispute',
+    username: 'ops-user',               // optional
+);
+```
+
+**Gateway endpoint:** `POST /payments/changeClearingStatus`
+
+Changes a transaction's clearing status. The gateway documents `Client-Type: BP` for this call, so the request sends `BP` instead of the usual `TP`. Any other status throws `InvalidArgumentException`.
+
+---
+
+## Reports
+
+### `reconciliationReport(array $query = []): array`
+
+```php
+Qredit::reconciliationReport([
+    'dateFrom'                => '01/09/2026',  // dd/MM/yyyy — defaults to 30 days ago
+    'dateTo'                  => '30/09/2026',  // defaults to today
+    'transactionStatus'       => 'SUCCESS',     // PENDING | SUCCESS | FAILED | CANCELLED | WAITING_APPROVAL
+    'clearingStatus'          => 'CLEARED',     // NOT_APPLICABLE | NOT_CLEARED | IN_CLEARING | CLEARED | ON_HOLD | REVERSED
+    'settlementReference'     => 'SET-123',
+    'paymentRequestReference' => '66573792',
+    'max'                     => 50,
+    'offset'                  => 0,
+]);
+```
+
+**Gateway endpoint:** `GET /reports/reconciliation`
+
+Accepts the same filters as `listTransactions()` except `clientReference`: `reference`, `providerReference`, `paymentRequestReference`, `settlementReference`, `orderReference`, `corporateId`, `subCorporateId`, `subCorporateAccountId`, `currencyCode`, `operation`, `onlyBalanceTransactions`, `transactionStatus`, `clearingStatus`, `sSearch`, `orderColumnName`, `orderDirection`.
+
+---
+
+## Corporate limits (admin)
+
+### `listCorporateLimitPeriods(array $query = []): array`
+
+```php
+Qredit::listCorporateLimitPeriods([
+    'corporateId'     => 'encoded-id',   // or 'corporateCode'
+    'limitSchemeId'   => 'encoded-id',   // or 'limitSchemeCode' => 'DEFAULT'
+    'periodType'      => 'DAILY',        // DAILY | MONTHLY
+    'interval'        => '2026-07-18',   // or '2026-07' for MONTHLY
+    'recordStatus'    => 'ACTIVE',
+    'sort'            => 'interval',     // id | interval | totalOrdersAmount | totalOrdersCount | recordStatus | periodType | limitSchemeCode
+    'dir'             => 'desc',         // asc | desc
+    'max'             => 10,
+    'offset'          => 0,
+]);
+```
+
+**Gateway endpoint:** `GET /admin/corporateLimitPeriods`
+
+Lists corporate limit period usage. Keys other than the ones above are dropped.
+
+---
+
+### `syncCorporateBranchLimit(string $corporateId, string $operation): array`
+
+```php
+Qredit::syncCorporateBranchLimit('encoded-corporate-id', 'CREATE'); // or 'DELETE'
+```
+
+**Gateway endpoint:** `POST /admin/admin/corporateBranchLimit` (the doubled `admin` is the documented path)
+
+Validates and syncs corporate limits when a branch is created or deleted. The gateway accepts only `Client-Type: SYS` for this call, so the request sends `SYS` instead of the connector's usual `TP`. Any operation other than `CREATE` / `DELETE` throws `InvalidArgumentException`.
 
 ---
 

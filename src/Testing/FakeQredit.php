@@ -90,8 +90,11 @@ class FakeQredit extends Qredit
     public function listPayments(array $query = []): array
     { return $this->record('listPayments', [$query], $this->defaultEnvelope()); }
 
-    public function generateQR(array $query): array
-    { return $this->record('generateQR', [$query], $this->defaultEnvelope()); }
+    public function generateQR(string|array $reference, ?string $productCode = null, ?int $expiryTimeLimit = null, ?string $merchantChannelMedia = null): array
+    { return $this->record('generateQR', [$reference, $productCode, $expiryTimeLimit, $merchantChannelMedia], $this->defaultEnvelope()); }
+
+    public function calculateFees(string $paymentRequestReference, string $productCode): array
+    { return $this->record('calculateFees', [$paymentRequestReference, $productCode], $this->defaultEnvelope()); }
 
     // Orders
     public function createOrder(array $data): array
@@ -118,6 +121,20 @@ class FakeQredit extends Qredit
 
     public function listTransactions(array $filters = []): array
     { return $this->record('listTransactions', [$filters], $this->defaultEnvelope()); }
+
+    public function changeClearingStatus(string $encodedId, string $clearingStatus, string $statusReason, ?string $username = null): array
+    { return $this->record('changeClearingStatus', [$encodedId, $clearingStatus, $statusReason, $username], $this->defaultEnvelope()); }
+
+    // Reports
+    public function reconciliationReport(array $query = []): array
+    { return $this->record('reconciliationReport', [$query], $this->defaultEnvelope()); }
+
+    // Corporate limits
+    public function listCorporateLimitPeriods(array $query = []): array
+    { return $this->record('listCorporateLimitPeriods', [$query], $this->defaultEnvelope()); }
+
+    public function syncCorporateBranchLimit(string $corporateId, string $operation): array
+    { return $this->record('syncCorporateBranchLimit', [$corporateId, $operation], $this->defaultEnvelope()); }
 
     // Webhook
     public function verifyWebhookSignature(array $payload, string $authorizationHeader, ?string $rawBody = null): bool

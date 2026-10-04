@@ -9,18 +9,23 @@ use Qredit\LaravelQredit\Connectors\QreditConnector;
 use Qredit\LaravelQredit\Exceptions\QreditAuthenticationException;
 use Qredit\LaravelQredit\Exceptions\QreditException;
 use Qredit\LaravelQredit\Requests\Auth\GetTokenRequest;
+use Qredit\LaravelQredit\Requests\CorporateLimits\ListCorporateLimitPeriodsRequest;
+use Qredit\LaravelQredit\Requests\CorporateLimits\SyncCorporateBranchLimitRequest;
 use Qredit\LaravelQredit\Requests\Customers\ListCustomersRequest;
 use Qredit\LaravelQredit\Requests\Orders\CancelOrderRequest;
 use Qredit\LaravelQredit\Requests\Orders\CreateOrderRequest;
 use Qredit\LaravelQredit\Requests\Orders\GetOrderRequest;
 use Qredit\LaravelQredit\Requests\Orders\ListOrdersRequest;
 use Qredit\LaravelQredit\Requests\Orders\UpdateOrderRequest;
+use Qredit\LaravelQredit\Requests\PaymentRequests\CalculateFeesRequest;
 use Qredit\LaravelQredit\Requests\PaymentRequests\CancelPaymentRequest;
 use Qredit\LaravelQredit\Requests\PaymentRequests\CreatePaymentRequest;
 use Qredit\LaravelQredit\Requests\PaymentRequests\GenerateQRRequest;
 use Qredit\LaravelQredit\Requests\PaymentRequests\GetPaymentRequest;
 use Qredit\LaravelQredit\Requests\PaymentRequests\ListPaymentRequestsRequest;
 use Qredit\LaravelQredit\Requests\PaymentRequests\UpdatePaymentRequest;
+use Qredit\LaravelQredit\Requests\Reports\ReconciliationReportRequest;
+use Qredit\LaravelQredit\Requests\Transactions\ChangeClearingStatusRequest;
 use Qredit\LaravelQredit\Requests\Transactions\ListTransactionsRequest;
 use Qredit\LaravelQredit\Security\HmacSigner;
 use Saloon\Http\Response;
@@ -219,9 +224,36 @@ class Qredit
         return $this->sendWithRetry(new ListPaymentRequestsRequest($query))->json();
     }
 
-    public function generateQR(array $query): array
-    {
+    /**
+     * Generate a QR for a payment request.
+     *
+     *   Qredit::generateQR('66573792', 'NC-QR', 1440, 'SCREEN_ELECTRONIC_WEBSITE');
+     *
+     * The legacy array form still works: generateQR(['reference' => ..., ...]).
+     *
+     * @param  string|array<string, mixed>  $reference  Payment request reference, or the full query array.
+     * @param  ?int  $expiryTimeLimit  Minutes; gateway default is 1440.
+     * @param  ?string  $merchantChannelMedia  One of GenerateQRRequest::MEDIA.
+     */
+    public function generateQR(
+        string|array $reference,
+        ?string $productCode = null,
+        ?int $expiryTimeLimit = null,
+        ?string $merchantChannelMedia = null,
+    ): array {
+        $query = is_array($reference) ? $reference : [
+            'reference' => $reference,
+            'productCode' => $productCode,
+            'expiryTimeLimit' => $expiryTimeLimit,
+            'merchantChannelMedia' => $merchantChannelMedia,
+        ];
+
         return $this->sendWithRetry(new GenerateQRRequest($query))->json();
+    }
+
+    public function calculateFees(string $paymentRequestReference, string $productCode): array
+    {
+        return $this->sendWithRetry(new CalculateFeesRequest($paymentRequestReference, $productCode))->json();
     }
 
     // ----- Orders ------------------------------------------------------------
@@ -266,6 +298,38 @@ class Qredit
     public function listTransactions(array $filters = []): array
     {
         return $this->sendWithRetry(new ListTransactionsRequest($filters))->json();
+    }
+
+    /**
+     * @param  string  $clearingStatus  NOT_CLEARED | CLEARED | ON_HOLD
+     */
+    public function changeClearingStatus(string $encodedId, string $clearingStatus, string $statusReason, ?string $username = null): array
+    {
+        return $this->sendWithRetry(new ChangeClearingStatusRequest($encodedId, $clearingStatus, $statusReason, $username))->json();
+    }
+
+    // ----- Reports ----------------------------------------------------------
+
+    public function reconciliationReport(array $query = []): array
+    {
+        return $this->sendWithRetry(new ReconciliationReportRequest($query))->json();
+    }
+
+    // ----- Corporate limits (admin) -----------------------------------------
+
+    public function listCorporateLimitPeriods(array $query = []): array
+    {
+        return $this->sendWithRetry(new ListCorporateLimitPeriodsRequest($query))->json();
+    }
+
+    /**
+     * Validate and sync corporate limits when a branch is created or deleted.
+     *
+     * @param  string  $operation  'CREATE' or 'DELETE'
+     */
+    public function syncCorporateBranchLimit(string $corporateId, string $operation): array
+    {
+        return $this->sendWithRetry(new SyncCorporateBranchLimitRequest($corporateId, $operation))->json();
     }
 
     // ----- Lookups (gw-lookup service) --------------------------------------
@@ -417,8 +481,10 @@ class Qredit
      */
     public function processWebhook(array $payload, ?string $authorizationHeader = null, ?string $rawBody = null): array
     {
-        if ($authorizationHeader !== null && config('qredit.verify_webhook_signature', true)) {
-            if (! $this->verifyWebhookSignature($payload, $authorizationHeader, $rawBody)) {
+        if (config('qredit.verify_webhook_signature', true)) {
+            // An unsigned request must not bypass verification.
+            if ($authorizationHeader === null || $authorizationHeader === ''
+                || ! $this->verifyWebhookSignature($payload, $authorizationHeader, $rawBody)) {
                 throw new QreditException('Invalid webhook signature');
             }
         }
