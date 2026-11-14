@@ -56,6 +56,9 @@ it('derives the event from transactionStatus', function (array $record, string $
     'reversed SUCCESS' => [webhookRecord(['isReversed' => true]), 'payment.reversed'],
     'unknown status' => [webhookRecord(['transactionStatus' => 'SOMETHING_NEW']), 'payment.unknown'],
     'missing status' => [array_diff_key(webhookRecord(), ['transactionStatus' => true]), 'payment.unknown'],
+    'event field cannot override PENDING' => [webhookRecord(['transactionStatus' => 'PENDING', 'event' => 'payment.completed']), 'payment.pending'],
+    'type field cannot override FAILED' => [webhookRecord(['transactionStatus' => 'FAILED', 'type' => 'payment.completed']), 'payment.failed'],
+    'event field used without a status' => [['event' => 'refund.completed'], 'refund.completed'],
 ]);
 
 it('fires PaymentCompleted only for a successful, non-reversed payment', function (array $record, ?string $expected) {
@@ -80,4 +83,23 @@ it('fires PaymentCompleted only for a successful, non-reversed payment', functio
     'reversed SUCCESS' => [webhookRecord(['isReversed' => true]), null],
     'unknown status' => [webhookRecord(['transactionStatus' => 'SOMETHING_NEW']), null],
     'missing status' => [array_diff_key(webhookRecord(), ['transactionStatus' => true]), null],
+    'event field on a PENDING record' => [webhookRecord(['transactionStatus' => 'PENDING', 'event' => 'payment.completed']), null],
 ]);
+
+it('verifies webhook signatures unless told not to', function () {
+    $key = 'QREDIT_VERIFY_WEBHOOK_SIGNATURE';
+    $saved = [$_ENV[$key] ?? null, $_SERVER[$key] ?? null, getenv($key)];
+    unset($_ENV[$key], $_SERVER[$key]);
+    putenv($key);
+
+    try {
+        $config = require __DIR__.'/../../config/qredit.php';
+    } finally {
+        [$env, $server, $put] = $saved;
+        $env !== null && $_ENV[$key] = $env;
+        $server !== null && $_SERVER[$key] = $server;
+        $put !== false && putenv("{$key}={$put}");
+    }
+
+    expect($config['verify_webhook_signature'])->toBeTrue();
+});

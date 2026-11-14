@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **`transactionStatus` decides the webhook event.** A payload's own `event`
+  or `type` field used to win over the record's status, so a webhook with
+  `event: payment.completed` and `transactionStatus: PENDING` fired
+  `PaymentCompleted`. The field is now used only when the record has no
+  `transactionStatus`.
+- **Webhook signatures are verified by default.** `verify_webhook_signature`
+  (`QREDIT_VERIFY_WEBHOOK_SIGNATURE`) now defaults to `true`. An app that never
+  set it now rejects unsigned or wrongly signed webhooks; set it to `false`
+  only on a local machine.
+
+## [1.0.3]
+
 ### Added
 
 - **New endpoints:** `calculateFees()` (`POST /paymentRequests/calculateFees`),

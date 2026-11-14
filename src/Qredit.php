@@ -492,11 +492,25 @@ class Qredit
         $data = $payload['records'][0] ?? $payload['data'] ?? $payload;
 
         return [
-            'event' => $payload['event'] ?? $payload['type'] ?? $this->deriveEventFromData($data),
+            'event' => $this->resolveEvent($payload, $data),
             'data' => $data,
             'raw' => $payload,
             'processed_at' => now()->toIso8601String(),
         ];
+    }
+
+    /**
+     * A record's `transactionStatus` decides the event; a payload `event` or
+     * `type` is only used when there is no status, so it can't mark a pending
+     * payment as completed.
+     */
+    protected function resolveEvent(array $payload, array $data): string
+    {
+        if (isset($data['transactionStatus'])) {
+            return $this->deriveEventFromData($data);
+        }
+
+        return $payload['event'] ?? $payload['type'] ?? $this->deriveEventFromData($data);
     }
 
     /**
