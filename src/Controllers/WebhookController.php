@@ -102,7 +102,6 @@ class WebhookController extends Controller
         switch ($eventType) {
             case 'payment.completed':
             case 'payment.success':
-            case 'transaction':
                 event(new PaymentCompleted($data));
                 break;
 

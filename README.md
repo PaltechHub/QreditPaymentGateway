@@ -373,7 +373,7 @@ Full [`config/qredit.php`](config/qredit.php) options:
 | `production_url` | `QREDIT_PRODUCTION_URL` | `https://api.qredit.tech/gw-checkout/api/v1` | |
 | `language` | `QREDIT_LANGUAGE` | `EN` | `Accept-Language` header |
 | `client.type` | — (hardcoded) | `TP` | `Client-Type` header — fixed; don't override |
-| `client.version` | `QREDIT_CLIENT_VERSION` | `ccc<semver>` | `Client-Version` header — derived from SDK version at runtime; set only to pin |
+| `client.version` | `QREDIT_CLIENT_VERSION` | — (**required**) | `Client-Version` header. Qredit issues a unique value per merchant account; there is no default, and the SDK throws if it is missing. Multi-tenant: supply it per tenant from your `CredentialProvider` |
 | `signing.scheme` | `QREDIT_AUTH_SCHEME` | `HmacSHA512_O` | Authorization prefix |
 | `signing.case` | `QREDIT_SIGNATURE_CASE` | `upper` | Hex case — live UAT accepts only `upper` |
 | `token_storage.strategy` | `QREDIT_TOKEN_STRATEGY` | `cache` | `cache`, `database`, or `hybrid` |
@@ -395,7 +395,7 @@ The Authorization header is missing or the scheme prefix is wrong. Send `HmacSHA
 
 ### `code 1012 "Bad Signature"`
 
-Usually a `Client-Type` / `Client-Version` header mismatch — the SDK hardcodes `TP` and derives the version dynamically, so this only fires if something upstream (proxy, CDN, WAF) rewrites those headers.
+Usually a `Client-Type` / `Client-Version` header mismatch — the SDK hardcodes `TP`, so check that `client_version` is the exact value Qredit issued for that merchant account, and that nothing upstream (proxy, CDN, WAF) rewrites those headers.
 
 ### `code 1904 "Operation not allowed"`
 

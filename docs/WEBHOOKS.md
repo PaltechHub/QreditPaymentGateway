@@ -82,50 +82,67 @@ class FulfillOrder
 
 ### Event mapping
 
-The controller maps gateway event strings to SDK events:
+The gateway's callback carries no `event` field, so `processWebhook()` derives
+one from the record's `transactionStatus` (`PENDING | SUCCESS | FAILED |
+CANCELLED | WAITING_APPROVAL`) and the controller dispatches on it:
 
-| Gateway payload `event` field | SDK event class |
-|---|---|
-| `payment.completed` / `payment.success` / `transaction` | `PaymentCompleted` |
-| `payment.failed` / `payment.declined` | `PaymentFailed` |
-| `order.cancelled` / `order.canceled` | `OrderCancelled` |
+| `transactionStatus` | Derived `event` | SDK event class |
+|---|---|---|
+| `SUCCESS` (and `isReversed` is not `true`) | `payment.completed` | `PaymentCompleted` |
+| `SUCCESS` with `isReversed: true` | `payment.reversed` | — |
+| `FAILED` | `payment.failed` | `PaymentFailed` |
+| `CANCELLED` | `order.cancelled` | `OrderCancelled` |
+| `PENDING` / `WAITING_APPROVAL` | `payment.pending` | — |
+| missing or anything else | `payment.unknown` | — |
 
-For payloads without an `event` field (Qredit's default callback shape per merchant guide §6 just includes `status`, `records[].transactionStatus`), the controller synthesizes `event: "transaction"` and dispatches `PaymentCompleted`. Customize the mapping by extending `WebhookController`.
+Only `SUCCESS` ever fires `PaymentCompleted`. Every webhook still fires
+`WebhookReceived`, so listen to that if you need to act on the other states.
 
-## Inbound payload shape (merchant guide §6)
+If a payload does carry an `event` field it wins; the controller accepts
+`payment.completed` / `payment.success`, `payment.failed` / `payment.declined`
+and `order.cancelled` / `order.canceled`. Customize the mapping by extending
+`WebhookController`.
+
+## Inbound payload shape
+
+The gateway posts a single, flat transaction record (values below are
+synthetic; the shape matches a live UAT callback):
 
 ```json
 {
-  "status": true,
-  "code": "00",
-  "message": "Success",
-  "reference": "1775133836693",
-  "totalCount": "1",
-  "offset": "0",
-  "records": [
-    {
-      "amount": 1000.00,
-      "currency": "ILS",
-      "operation": "ONLINE_QR_PURCHASE",
-      "reference": "123456789",
-      "clientReference": "CLI-987",
-      "providerReference": "PROV-456",
-      "transactionStatus": "SUCCESS",
-      "paymentRequest": { "encodedId": "pay_req_888", "amount": 1000.00 },
-      "senderAccount": { "encodedId": "acc_001", "accountNumber": "12345678", "currencyCode": "ILS" },
-      "receiverAccount": { "encodedId": "acc_002", "accountNumber": "87654321", "currencyCode": "ILS" },
-      "transDateTimeText": "03/04/2026 15:20:59"
-    }
-  ]
+  "amount": 100.0,
+  "collectionMode": "GATEWAY_COLLECTED",
+  "currency": "ILS",
+  "isReversed": false,
+  "operation": "ONLINE_CARD_PURCHASE",
+  "paymentRequest": {
+    "amount": 100.0,
+    "amountCents": 10000,
+    "orderReference": "1111111111",
+    "paymentRequestStatus": "PAYMENT_IN_PROGRESS",
+    "reference": "22222222",
+    "url": "https://portaltest.qredit.tech/#/pay/TOKEN"
+  },
+  "productCode": "CSAB",
+  "providerReference": "3333333333333333333333",
+  "receiverAccount": { "encodedId": "SUBCORP_ID", "accountNumber": "MRC/000000/000", "currencyCode": "ILS" },
+  "reference": "4444444444444444",
+  "transDateTimeText": "08/11/2026 07:56:51",
+  "transactionStatus": "SUCCESS",
+  "msgId": "sproxy_5555555555555555555555"
 }
 ```
+
+There is no `clientReference` on the record; match your order through
+`paymentRequest.reference` or `paymentRequest.orderReference`. The SDK also
+accepts a `records[0]` or `data` envelope if one is ever sent.
 
 `processWebhook()` normalizes this to:
 
 ```php
 [
-    'event'         => 'transaction',       // or whatever $payload['event'] is
-    'data'          => $payload['records'][0] + ['_tenant_id' => 'tenant-b'],
+    'event'         => 'payment.completed', // derived from transactionStatus, or $payload['event']
+    'data'          => $record + ['_tenant_id' => 'tenant-b'],
     'raw'           => $payload,
     'tenant_id'     => 'tenant-b',
     'processed_at'  => '2026-04-14T18:06:06+00:00',

@@ -237,7 +237,7 @@ class QreditWebhookController
         }
 
         match ($result['event']) {
-            'payment.succeeded', 'transaction' => $this->markPaid($result['data']),
+            'payment.completed' => $this->markPaid($result['data']),
             'payment.failed' => $this->markFailed($result['data']),
             default => \Log::info('Unhandled Qredit event', $result),
         };

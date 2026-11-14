@@ -32,7 +32,7 @@ If one host returns `1705 User Not Found` and another returns `1004 Bad Signatur
 The gateway's verify path is gated on these two headers. If they're wrong, you'll see `1012 Bad Signature` no matter how correct your hash is.
 
 - `Client-Type` must be `TP` — the SDK hardcodes this, don't override.
-- `Client-Version` must be the `ccc<semver>` string the SDK sends automatically (e.g. `ccc1.0`). Override via `QREDIT_CLIENT_VERSION` only if Qredit has negotiated a specific string for your integration.
+- `Client-Version` must be the exact value Qredit issued for that merchant account. It is required and has no default: pass `client_version` per tenant, or set `QREDIT_CLIENT_VERSION`.
 
 ### 3. Verify the signer against a known-good output
 
