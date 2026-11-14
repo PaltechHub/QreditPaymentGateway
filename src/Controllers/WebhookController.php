@@ -13,6 +13,7 @@ use Qredit\LaravelQredit\Events\PaymentCompleted;
 use Qredit\LaravelQredit\Events\PaymentFailed;
 use Qredit\LaravelQredit\Events\WebhookReceived;
 use Qredit\LaravelQredit\Exceptions\QreditException;
+use Qredit\LaravelQredit\Qredit;
 use Qredit\LaravelQredit\QreditManager;
 
 /**
@@ -66,6 +67,22 @@ class WebhookController extends Controller
 
             $processed['tenant_id'] = $tenantId;
 
+            if ($this->completesPayment($processed)) {
+                $confirmed = $this->confirmPaid($client, $processed['data']);
+
+                if ($confirmed === null) {
+                    Log::channel(config('qredit.logging.channel', 'stack'))
+                        ->warning('Qredit webhook: payment not confirmed as PAID, asking the gateway to retry', [
+                            'tenant_id' => $tenantId,
+                            'payment_reference' => $processed['data']['paymentRequest']['reference'] ?? null,
+                        ]);
+
+                    return response()->json(['status' => 'retry', 'message' => 'Payment not confirmed yet'], 503);
+                }
+
+                $processed['data'] = $confirmed;
+            }
+
             if (config('qredit.debug', false)) {
                 Log::channel(config('qredit.logging.channel', 'stack'))
                     ->debug('Qredit webhook received', $processed);
@@ -92,6 +109,41 @@ class WebhookController extends Controller
 
             return response()->json(['status' => 'error'], 500);
         }
+    }
+
+    protected function completesPayment(array $processed): bool
+    {
+        return in_array($processed['event'] ?? null, ['payment.completed', 'payment.success'], true);
+    }
+
+    /**
+     * Ask the gateway whether the payment request is really PAID before anyone
+     * records money. The webhook's nested `paymentRequest` may be unsigned, so
+     * it is replaced with the gateway's own record. Null = not (yet) paid; the
+     * 503 makes Qredit redeliver, so a payment that is still settling is not lost.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>|null
+     */
+    protected function confirmPaid(Qredit $client, array $data): ?array
+    {
+        $reference = $data['paymentRequest']['reference'] ?? null;
+
+        if (! is_string($reference) && ! is_int($reference)) {
+            return null;
+        }
+
+        $record = $client->getPayment((string) $reference)['records'][0] ?? null;
+
+        if (! is_array($record)
+            || (string) ($record['reference'] ?? '') !== (string) $reference
+            || strtoupper((string) ($record['paymentRequestStatus'] ?? '')) !== 'PAID') {
+            return null;
+        }
+
+        $data['paymentRequest'] = array_replace((array) $data['paymentRequest'], $record);
+
+        return $data;
     }
 
     protected function dispatchSpecificEvent(array $processed): void

@@ -36,8 +36,9 @@ Content-Type: application/json
 1. `TenantResolver::tenantIdFromWebhook($request)` extracts `"tenant-b"` (usually from the `{tenant}` route parameter).
 2. `QreditManager::forTenant("tenant-b")` returns that tenant's client, carrying their `secretKey`.
 3. The client calls `verifyWebhookSignature($payload, $authorizationHeader)` — HMAC SHA512 over the sorted scalar values, using `md5(secretKey + msgId)` as the key. Matches the outbound signing algorithm exactly (merchant guide §6).
-4. On success, a `WebhookReceived` event fires, plus a typed event based on the payload type.
-5. Controller returns `200 { "status": "RECEIVED" }`. Qredit will retry on any other response.
+4. If the record says `SUCCESS`, the controller asks the gateway (`getPayment()` on `paymentRequest.reference`) whether the payment request is really `PAID`. The webhook's nested `paymentRequest` can be unsigned (see below), so it is replaced with the gateway's record. Anything other than `PAID` (still in progress, cancelled, unknown, or a reference mismatch) returns `503 { "status": "retry" }` with no events, so Qredit redelivers once the payment settles. A gateway error returns `500`, which Qredit also retries.
+5. On success, a `WebhookReceived` event fires, plus a typed event based on the payload type.
+6. Controller returns `200 { "status": "RECEIVED" }`. Qredit will retry on any other response.
 
 ## Typed events
 
@@ -162,6 +163,10 @@ To disable signature verification (NOT recommended — dev/local only):
 ```env
 QREDIT_VERIFY_WEBHOOK_SIGNATURE=false
 ```
+
+### What the signature covers
+
+The gateway's inbound signer may sign only the **top-level scalar values**, leaving nested objects (`paymentRequest`, any `records` / `data` wrapper) unsigned. `processWebhook()` reports which variant matched in `signature_coverage`: `body` (everything) or `top-level`. With `top-level`, the record is read from the top level and a `records` / `data` wrapper is ignored, because someone could have added it. The nested `paymentRequest` of a completed payment is always replaced by the gateway's own record (step 4 above).
 
 ## Handling retries + idempotency
 

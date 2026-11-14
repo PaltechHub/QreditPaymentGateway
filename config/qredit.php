@@ -208,11 +208,11 @@ return [
     | Webhook Signature Verification
     |--------------------------------------------------------------------------
     |
-    | Whether to verify webhook signatures. It's highly recommended to keep
-    | this enabled in production for security.
+    | Whether to verify webhook signatures. On by default: an unverified
+    | webhook can fake a payment. Turn it off only on a local machine.
     |
     */
-    'verify_webhook_signature' => env('QREDIT_VERIFY_WEBHOOK_SIGNATURE', false),
+    'verify_webhook_signature' => env('QREDIT_VERIFY_WEBHOOK_SIGNATURE', true),
 
     /*
     |--------------------------------------------------------------------------

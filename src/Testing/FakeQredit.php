@@ -142,12 +142,14 @@ class FakeQredit extends Qredit
 
     public function processWebhook(array $payload, ?string $authorizationHeader = null, ?string $rawBody = null): array
     {
-        return $this->record('processWebhook', [$payload, $authorizationHeader, $rawBody], [
-            'event' => 'transaction',
-            'data' => $payload['records'][0] ?? $payload,
-            'raw' => $payload,
-            'processed_at' => date('c'),
-        ]);
+        // Same status → event mapping as the real client, unless a test overrides it.
+        if (! array_key_exists('processWebhook', $this->responses)) {
+            $this->calls[] = ['method' => 'processWebhook', 'args' => [$payload, $authorizationHeader, $rawBody]];
+
+            return parent::processWebhook($payload, $authorizationHeader, $rawBody);
+        }
+
+        return $this->record('processWebhook', [$payload, $authorizationHeader, $rawBody], null);
     }
 
     // ---- Internals ------------------------------------------------------
