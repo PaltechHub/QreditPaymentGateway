@@ -455,8 +455,8 @@ Verify + normalize a payload into an SDK-shape envelope for event dispatch.
 $processed = Qredit::processWebhook($request->all(), $request->header('Authorization'));
 
 // $processed = [
-//     'event'         => 'transaction',
-//     'data'          => $payload['records'][0],
+//     'event'         => 'payment.completed', // see docs/WEBHOOKS.md for the status mapping
+//     'data'          => $record,
 //     'raw'           => $payload,
 //     'tenant_id'     => 'tenant-b',
 //     'processed_at'  => '2026-04-14T18:06:06+00:00',
@@ -563,7 +563,7 @@ These are attached by `QreditConnector::defaultHeaders()` + `BaseQreditRequest::
 | `Content-Type: application/json` | for POST / PUT / PATCH / DELETE |
 | `Accept-Language: EN` or `AR` | config or per-tenant language |
 | `Client-Type: TP` | hardcoded in the connector — other values lock you out of `/auth/token` |
-| `Client-Version: ccc<semver>` | derived at runtime from the SDK's composer version; override via `QREDIT_CLIENT_VERSION` only if Qredit has negotiated a specific string |
+| `Client-Version: <issued value>` | **required** — the value Qredit issued for the merchant account (`client_version` per tenant, or `QREDIT_CLIENT_VERSION`); no default |
 | `X-Auth-Token: <jwt>` | after first successful auth |
 | `Authorization: HmacSHA512_O <hex>` | computed per-request |
 

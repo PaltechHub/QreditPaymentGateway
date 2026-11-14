@@ -23,7 +23,7 @@ The gateway gates on two request headers before it'll even look at the signature
 | Header | Value | Notes |
 |---|---|---|
 | `Client-Type` | `TP` | Fixed. Other values lock you out of `/auth/token`. |
-| `Client-Version` | `ccc<semver>` | Dynamic — derived from the SDK's installed composer version at runtime. Override via `QREDIT_CLIENT_VERSION` only if Qredit has negotiated a specific string for your integration. |
+| `Client-Version` | issued by Qredit | **Required**, no default. Qredit issues a unique value per merchant account; pass it as `client_version` per tenant or set `QREDIT_CLIENT_VERSION`. |
 | `Accept-Language` | `EN` / `AR` | Per tenant. |
 | `Authorization` | `HmacSHA512_O <hex>` | Uppercase hex. The `HmacSHA512_O` prefix is a protocol literal; lives in `config/qredit.php` under `signing.scheme`. |
 

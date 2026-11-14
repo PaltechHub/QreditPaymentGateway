@@ -500,19 +500,25 @@ class Qredit
     }
 
     /**
-     * Map the gateway's `transactionStatus` onto one of the event names our
-     * dispatcher understands. The production webhook envelope does not carry an
-     * `event` field, so we derive it from the transaction record itself.
+     * Map the gateway's `transactionStatus` onto an event name. The webhook
+     * carries no `event` field, so it is derived from the record. Only SUCCESS
+     * counts as paid: PENDING, WAITING_APPROVAL, a reversed transaction or any
+     * status we don't know must never be reported as a completed payment.
      */
     protected function deriveEventFromData(array $data): string
     {
         $status = strtoupper((string) ($data['transactionStatus'] ?? ''));
 
+        if ($status === 'SUCCESS' && ($data['isReversed'] ?? false) === true) {
+            return 'payment.reversed';
+        }
+
         return match ($status) {
-            'SUCCESS', 'APPROVED', 'COMPLETED', 'PAID' => 'payment.completed',
-            'FAILED', 'DECLINED', 'REJECTED', 'ERROR' => 'payment.failed',
-            'CANCELLED', 'CANCELED', 'VOIDED' => 'order.cancelled',
-            default => 'transaction',
+            'SUCCESS' => 'payment.completed',
+            'FAILED' => 'payment.failed',
+            'CANCELLED' => 'order.cancelled',
+            'PENDING', 'WAITING_APPROVAL' => 'payment.pending',
+            default => 'payment.unknown',
         };
     }
 

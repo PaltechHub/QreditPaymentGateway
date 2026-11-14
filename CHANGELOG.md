@@ -27,6 +27,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Unsigned webhooks are rejected.** With `verify_webhook_signature` on, a
   request without an `Authorization` header used to skip verification
   entirely, so anyone could post a fake payment event.
+- **Only `SUCCESS` webhooks fire `PaymentCompleted`.** Any `transactionStatus`
+  the SDK didn't recognise, including Qredit's own `PENDING` and
+  `WAITING_APPROVAL` or a missing status, fell through to the `transaction`
+  event, which the controller treated as a completed payment. They now derive
+  `payment.pending` / `payment.unknown`, and a `SUCCESS` record with
+  `isReversed: true` derives `payment.reversed`; none of these fire a
+  payment event (`WebhookReceived` still fires). The `transaction` event name
+  is gone, and the status list is trimmed to the values Qredit documents.
+
+### Documentation
+
+- `client_version` is documented as required. The docs said it was derived
+  from the SDK version and optional, but the connector throws without it and
+  Qredit issues a unique value per merchant account.
+- `docs/WEBHOOKS.md` shows the real callback shape: a flat transaction record,
+  not a `records[]` envelope.
 
 ### Changed
 
