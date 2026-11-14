@@ -365,6 +365,16 @@ class Qredit
      * signs the JSON number literals it emitted, and json_decode destroys them —
      * `10.0` becomes float(10), which stringifies to `"10"` and never matches.
      */
+    public const SIGNATURE_COVERS_BODY = 'body';
+
+    public const SIGNATURE_COVERS_TOP_LEVEL = 'top-level';
+
+    /**
+     * What the last verified webhook signature covered: the whole body, or only
+     * its top-level scalars (nested values unsigned). Null when unverified.
+     */
+    protected ?string $lastSignatureCoverage = null;
+
     public function verifyWebhookSignature(array $payload, string $authorizationHeader, ?string $rawBody = null): bool
     {
         $scheme = $this->connector->getAuthScheme();
@@ -432,13 +442,24 @@ class Qredit
             strtoupper($expectedFullLower),
         ]);
 
-        $matches = false;
+        $coversWholeBody = array_filter([
+            $expectedRawLower,
+            $expectedRawLower !== null ? strtoupper($expectedRawLower) : null,
+            $expectedFullLower,
+            strtoupper($expectedFullLower),
+        ]);
+
+        $this->lastSignatureCoverage = null;
         foreach ($candidates as $candidate) {
             if (hash_equals($candidate, $providedSignature)) {
-                $matches = true;
+                $this->lastSignatureCoverage = in_array($candidate, $coversWholeBody, true)
+                    ? self::SIGNATURE_COVERS_BODY
+                    : self::SIGNATURE_COVERS_TOP_LEVEL;
                 break;
             }
         }
+
+        $matches = $this->lastSignatureCoverage !== null;
 
         if (! $matches) {
             $log->warning('Qredit webhook: signature mismatch', [
@@ -481,6 +502,8 @@ class Qredit
      */
     public function processWebhook(array $payload, ?string $authorizationHeader = null, ?string $rawBody = null): array
     {
+        $this->lastSignatureCoverage = null;
+
         if (config('qredit.verify_webhook_signature', true)) {
             // An unsigned request must not bypass verification.
             if ($authorizationHeader === null || $authorizationHeader === ''
@@ -489,12 +512,17 @@ class Qredit
             }
         }
 
-        $data = $payload['records'][0] ?? $payload['data'] ?? $payload;
+        // A top-level-only signature leaves a `records` / `data` wrapper unsigned,
+        // so it can't be the source of the record.
+        $data = $this->lastSignatureCoverage === self::SIGNATURE_COVERS_TOP_LEVEL
+            ? $payload
+            : ($payload['records'][0] ?? $payload['data'] ?? $payload);
 
         return [
             'event' => $this->resolveEvent($payload, $data),
             'data' => $data,
             'raw' => $payload,
+            'signature_coverage' => $this->lastSignatureCoverage,
             'processed_at' => now()->toIso8601String(),
         ];
     }

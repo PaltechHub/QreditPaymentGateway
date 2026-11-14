@@ -18,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`QREDIT_VERIFY_WEBHOOK_SIGNATURE`) now defaults to `true`. An app that never
   set it now rejects unsigned or wrongly signed webhooks; set it to `false`
   only on a local machine.
+- **A completed payment is confirmed with the gateway.** A signature may cover
+  only a callback's top-level values, so its nested `paymentRequest` (the order
+  reference listeners match on) or an added `records` wrapper could be changed
+  without breaking it. Before firing `PaymentCompleted`, the webhook controller
+  now asks the gateway whether that payment request is `PAID` and replaces the
+  nested `paymentRequest` with the gateway's record. Anything else returns 503,
+  so Qredit redelivers once the payment settles. A top-level-only signature no
+  longer reads the record from a `records` / `data` wrapper, and
+  `processWebhook()` reports `signature_coverage` (`body` | `top-level`).
+- **`FakeQredit::processWebhook()` maps statuses like the real client.** It used
+  to return the removed `transaction` event.
 
 ## [1.0.3]
 
