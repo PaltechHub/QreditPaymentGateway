@@ -90,7 +90,10 @@ class QreditManager
      * Returns an empty `accessToken` if gateway auth fails; the partial turns
      * that into a `qredit:widget-error` event rather than a broken embed.
      *
-     * @return array{reference: string, accessToken: string, locale: string, signUrl: string, widgetScriptUrl: string, widgetGatewayUrl: string}
+     * The loader follows the store's own `sandbox` flag: each build iframes the
+     * gateway that matches it, so the script is the only Qredit URL sent.
+     *
+     * @return array{reference: string, accessToken: string, locale: string, signUrl: string, widgetScriptUrl: string}
      */
     public function widgetProps(string $reference, string $locale = 'en', ?string $tenantId = null): array
     {
@@ -110,9 +113,23 @@ class QreditManager
             'accessToken' => $accessToken,
             'locale' => strtolower($locale) === 'ar' ? 'ar' : 'en',
             'signUrl' => route('qredit.sign'),
-            'widgetScriptUrl' => (string) config('qredit.widget.script_url'),
-            'widgetGatewayUrl' => (string) config('qredit.widget.gateway_url'),
+            'widgetScriptUrl' => $this->widgetScriptUrl($tenantId),
         ];
+    }
+
+    /**
+     * The live or UAT loader, by the store's own `sandbox` flag. A store whose
+     * credentials cannot be read gets the UAT one, like the client's default.
+     */
+    protected function widgetScriptUrl(?string $tenantId): string
+    {
+        try {
+            $sandbox = $this->credentials->credentialsFor($tenantId)->sandbox;
+        } catch (\Throwable) {
+            $sandbox = true;
+        }
+
+        return (string) config($sandbox ? 'qredit.widget.sandbox_script_url' : 'qredit.widget.script_url');
     }
 
     public function credentials(): CredentialProvider
