@@ -29,7 +29,7 @@ class RouteMacros
     public static function register(): void
     {
         // The widget POSTs here from inside the gateway's own iframe origin
-        // (pay.blockbuilders.ps), so this is always a cross-origin request with
+        // (portal / portaltest.qredit.tech), so this is always a cross-origin request with
         // no session and no CSRF token — the same shape as the webhook.
         Route::macro('qreditSign', function (string $path = '/qredit/sign', array $middleware = ['web']) {
             return Route::middleware($middleware)

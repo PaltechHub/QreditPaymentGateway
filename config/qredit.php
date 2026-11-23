@@ -320,10 +320,12 @@ return [
     |   a copy forks nothing of their payment logic.
     |
     | - gateway_url: Origin the widget iframes for the payment form itself. Sent
-    |   as `serverUrl` on init. MUST be set explicitly: 1.0.9 hardcoded the
-    |   production gateway, while 1.1.0+ defaults to BlockBuilders' UAT portal —
-    |   so leaving it unset silently points live checkout at UAT. Follows the
-    |   `sandbox` flag unless QREDIT_WIDGET_GATEWAY_URL overrides it.
+    |   as `serverUrl` on init. MUST be sent: 1.0.9 hardcoded the production
+    |   gateway, while 1.1.0+ defaults to BlockBuilders' UAT portal — so without
+    |   it live checkout silently points at UAT. Follows the `sandbox` flag
+    |   (portaltest = apitest, portal = api.qredit.tech) unless
+    |   QREDIT_WIDGET_GATEWAY_URL overrides it. pay.blockbuilders.ps/plugin/
+    |   talks to apitest, so it is not a production gateway.
     |
     |   1.2.0 dropped `serverUrl` from their merchant docs while leaving it in
     |   the code (upstream calls it a development-only concern). We depend on it
@@ -353,7 +355,7 @@ return [
         ),
         'gateway_url' => env('QREDIT_WIDGET_GATEWAY_URL', env('QREDIT_SANDBOX', true)
             ? 'https://portaltest.qredit.tech/plugin/'
-            : 'https://pay.blockbuilders.ps/plugin/'),
+            : 'https://portal.qredit.tech/plugin/'),
         'webview_signed_ttl_minutes' => (int) env('QREDIT_WEBVIEW_SIGNED_TTL_MINUTES', 120),
         'default_height' => env('QREDIT_WIDGET_HEIGHT', '1000px'),
         'default_width' => env('QREDIT_WIDGET_WIDTH', '100%'),
