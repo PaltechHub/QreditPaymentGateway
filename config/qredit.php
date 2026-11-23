@@ -307,29 +307,21 @@ return [
     | Checkout widget
     |--------------------------------------------------------------------------
     |
-    | - script_url: Where the BlockBuilders loader is fetched from. Their own
-    |   nginx, on an unversioned path they replace in place — by design, so there
-    |   is nothing to pin: no matching git tag, no per-version copy on the host,
-    |   and jsdelivr stops at v1.0.9. It went 1.1.0 -> 1.2.0 in a day under us.
-    |   Everything we rely on is asserted in the widget contract check; run it
-    |   against a fresh download before blaming checkout on our own code.
+    | - script_url / sandbox_script_url: The BlockBuilders loader, live and UAT.
+    |   It is the only Qredit URL the page sends. Each build iframes its own
+    |   portal when `serverUrl` is left out (checked against 1.2.0):
     |
-    |   Two live problems: the host is `portaltest` (UAT), and a third party can
-    |   change the script on our checkout page whenever they like. Mirroring the
-    |   file is the fix for both — it is ~4KB and only iframes `gateway_url`, so
-    |   a copy forks nothing of their payment logic.
+    |     portal.qredit.tech/sdk/…      -> portal.qredit.tech/plugin/     (api.qredit.tech)
+    |     portaltest.qredit.tech/sdk/…  -> portaltest.qredit.tech/plugin/ (apitest)
     |
-    | - gateway_url: Origin the widget iframes for the payment form itself. Sent
-    |   as `serverUrl` on init. MUST be sent: 1.0.9 hardcoded the production
-    |   gateway, while 1.1.0+ defaults to BlockBuilders' UAT portal — so without
-    |   it live checkout silently points at UAT. Follows the `sandbox` flag
-    |   (portaltest = apitest, portal = api.qredit.tech) unless
-    |   QREDIT_WIDGET_GATEWAY_URL overrides it. pay.blockbuilders.ps/plugin/
-    |   talks to apitest, so it is not a production gateway.
+    |   So the store's `sandbox` flag picks the script, and the script picks the
+    |   gateway that accepts that store's token. We never send `serverUrl`: a
+    |   second URL that can disagree with the script is what pointed live
+    |   checkout at pay.blockbuilders.ps (an apitest gateway) and left the form
+    |   loading forever. Upstream calls `serverUrl` development-only.
     |
-    |   1.2.0 dropped `serverUrl` from their merchant docs while leaving it in
-    |   the code (upstream calls it a development-only concern). We depend on it
-    |   in production, so the contract check asserts it still overrides.
+    |   Their nginx replaces the file in place on an unversioned path, so there
+    |   is nothing to pin. It went 1.1.0 -> 1.2.0 in a day under us.
     |
     | - webview_signed_ttl_minutes: Lifetime of the signed /qredit/webview/show
     |   URL handed to a mobile app. Long enough for the customer to finish paying.
@@ -349,13 +341,8 @@ return [
     |
     */
     'widget' => [
-        'script_url' => env(
-            'QREDIT_WIDGET_SCRIPT_URL',
-            'https://portaltest.qredit.tech/sdk/payment-widget.min.js',
-        ),
-        'gateway_url' => env('QREDIT_WIDGET_GATEWAY_URL', env('QREDIT_SANDBOX', true)
-            ? 'https://portaltest.qredit.tech/plugin/'
-            : 'https://portal.qredit.tech/plugin/'),
+        'script_url' => env('QREDIT_WIDGET_SCRIPT_URL', 'https://portal.qredit.tech/sdk/payment-widget.min.js'),
+        'sandbox_script_url' => env('QREDIT_WIDGET_SANDBOX_SCRIPT_URL', 'https://portaltest.qredit.tech/sdk/payment-widget.min.js'),
         'webview_signed_ttl_minutes' => (int) env('QREDIT_WEBVIEW_SIGNED_TTL_MINUTES', 120),
         'default_height' => env('QREDIT_WIDGET_HEIGHT', '1000px'),
         'default_width' => env('QREDIT_WIDGET_WIDTH', '100%'),

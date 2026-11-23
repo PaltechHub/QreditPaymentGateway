@@ -15,8 +15,7 @@
         $direction       — 'rtl' | 'ltr'
         $urls            — Qredit\LaravelQredit\Tenancy\QreditRedirectUrls
         $signUrl         — fully qualified URL of the merchant signing endpoint
-        $widgetScriptUrl — URL of payment-widget.min.js
-        $widgetGatewayUrl — origin the widget iframes (sent as serverUrl)
+        $widgetScriptUrl — live or UAT payment-widget.min.js; it iframes its own gateway
         $height / $width — widget iframe dimensions
 --}}
 @php

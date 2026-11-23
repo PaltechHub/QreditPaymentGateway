@@ -19,8 +19,7 @@
         $accessToken      merchant gateway access token, fetched server-side
         $locale           'ar' | 'en'
         $signUrl          absolute URL of the merchant signing endpoint
-        $widgetScriptUrl  loader URL (config qredit.widget.script_url)
-        $widgetGatewayUrl origin the widget iframes (config qredit.widget.gateway_url)
+        $widgetScriptUrl  live or UAT loader; it iframes its own gateway
         $returnUrls       ['success' => …, 'cancel' => …, 'failure' => …, 'pending' => …]
 
     Optional:
@@ -77,8 +76,6 @@
             try {
                 PaymentWidget.init({
                     containerId: @json($qreditContainerId),
-                    {{-- Explicit since 1.1.0: its own default is the UAT portal. --}}
-                    serverUrl:   @json($widgetGatewayUrl ?? config('qredit.widget.gateway_url')),
                     ereference:  reference,
                     token:       token,
                     url:         signUrl,
